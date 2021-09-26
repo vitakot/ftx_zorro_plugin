@@ -12,6 +12,9 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 
 class FTXClient {
 
+public:
+    void getAccountInfo();
+
 };
 
 

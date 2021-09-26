@@ -7,4 +7,11 @@ SPDX-License-Identifier: MIT
 Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 */
 
-#include "../include/ftx_client.h"
+#include "ftx_client.h"
+
+
+void FTXClient::getAccountInfo() {
+
+//    auto response = http_client.get("account");
+//    return json::parse(response.body());
+}
