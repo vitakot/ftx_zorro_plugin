@@ -4,3 +4,6 @@
 [submodule "websocketpp"]
 	path = websocketpp
 	url = git@github.com:zaphoyd/websocketpp.git
+[submodule "cpp-httplib"]
+	path = cpp-httplib
+	url = git@github.com:yhirose/cpp-httplib.git
