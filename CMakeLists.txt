@@ -4,11 +4,11 @@ project(ftx_zorro_plugin)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(Boost 1.77 REQUIRED)
+find_package(OpenSSL REQUIRED)
 
-link_directories (OpenSSL/lib ${Boost_LIBRARY_DIRS})
-include_directories(include cpp-httplib json/include OpenSSL/include SYSTEM ${Boost_INCLUDE_DIR})
+include_directories(include cpp-httplib json/include SYSTEM ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
 
-add_subdirectory(cpp-httplib json)
+add_subdirectory(json)
 
 #add_library(ftx SHARED
 #        ftx.cpp
@@ -19,4 +19,4 @@ add_executable(ftx_test
         src/ftx_client.cpp
         src/utils.cpp)
 
-target_link_libraries(ftx_test libcrypto libssl)
+target_link_libraries(ftx_test OpenSSL::Crypto OpenSSL::SSL)

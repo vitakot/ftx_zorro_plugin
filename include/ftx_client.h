@@ -13,16 +13,15 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 
 #include <string>
-#include "httplib.h"
 
 class FTXClient {
 
-    std::unique_ptr<httplib::Client> m_httpClient;
+   // std::unique_ptr<httplib::Client> m_httpClient;
     const std::string m_apiKey;
     const std::string m_apiSecret;
     const std::string m_subAccountName;
 
-    httplib::Headers prepareHeaders(const std::string &method, const std::string &path, const std::string &body, const std::string &subAccountName);
+    //httplib::Headers prepareHeaders(const std::string &method, const std::string &path, const std::string &body, const std::string &subAccountName);
 
 public:
     FTXClient(std::string apiKey, std::string apiSecret, std::string subAccountName);
