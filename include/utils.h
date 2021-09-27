@@ -41,6 +41,6 @@ inline std::chrono::milliseconds getMsTimestamp(TimePoint time) {
 
 std::string hmacString(const std::string &secret, std::string msg, std::size_t signedLen);
 
-std::string stringToHex(unsigned char *data, std::size_t len);
+std::string stringToHex(const unsigned char *data, std::size_t len);
 
 #endif //FTX_ZORRO_PLUGIN_UTILS_H
