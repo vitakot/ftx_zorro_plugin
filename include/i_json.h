@@ -18,7 +18,7 @@ struct IJson {
 
     /**
      * Serialize object to JSON object
-     * @throws nlohmann::json::exception
+     * @throws nlohmann::json::exception, std::exception
      * @return
      */
     [[nodiscard]] virtual nlohmann::json toJson() const = 0;
@@ -26,9 +26,10 @@ struct IJson {
     /**
      * Deserialize object from JSON object
      * @param json
+     * @throws nlohmann::json::exception, std::exception
      * @return
      */
-    virtual bool fromJson(const nlohmann::json &json) = 0;
+    virtual void fromJson(const nlohmann::json &json) = 0;
 };
 
 #endif // I_JSON_H

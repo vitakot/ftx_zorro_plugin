@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
         std::cerr << e.what();
     }
 
-    ftxClient->getAccountInfo();
+    auto ret = ftxClient->getAccountInfo();
 
     return 0;
 }

@@ -18,15 +18,45 @@ using Clock = std::chrono::system_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 
 template<typename ValueType>
-bool readValue(const nlohmann::json &json, const std::string &key, ValueType &value) {
+bool readValue(const nlohmann::json &json, const std::string &key, ValueType &value, bool canThrow = true) {
     nlohmann::json::const_iterator it;
 
     it = json.find(key);
 
-    if (it != json.end()) {
-        value = it.value();
+    if (canThrow) {
+        if (!it.value().is_null()) {
+            value = it.value();
+        }
         return true;
+    } else {
+        if (it != json.end()) {
+            if (!it.value().is_null()) {
+                value = it.value();
+            }
+            return true;
+        }
+    }
+    return false;
+}
 
+template<typename ValueType>
+bool readEnum(const nlohmann::json &json, const std::string &key, ValueType &value, bool canThrow = true) {
+    nlohmann::json::const_iterator it;
+
+    it = json.find(key);
+
+    if (canThrow) {
+        if (!it.value().is_null()) {
+            value = ValueType::_from_string(it->get<std::string>().c_str());
+        }
+        return true;
+    } else {
+        if (it != json.end()) {
+            if (!it.value().is_null()) {
+                value = ValueType::_from_string(it->get<std::string>().c_str());
+            }
+            return true;
+        }
     }
     return false;
 }

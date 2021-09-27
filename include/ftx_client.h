@@ -11,6 +11,7 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #define FTX_ZORRO_PLUGIN_FTXCLIENT_H
 
 #include "http_session.h"
+#include "ftx_models.h"
 #include <string>
 #include <memory>
 
@@ -20,7 +21,7 @@ class FTXClient {
 public:
     FTXClient(const std::string &apiKey, const std::string &apiSecret, const std::string &subAccountName);
 
-    void getAccountInfo();
+    Account getAccountInfo();
 };
 
 #endif //FTX_ZORRO_PLUGIN_FTXCLIENT_H

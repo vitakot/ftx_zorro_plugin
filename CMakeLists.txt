@@ -7,7 +7,7 @@ add_definitions(-D_WIN32_WINNT=0x0A00)
 find_package(Boost 1.77 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-include_directories(include json/include SYSTEM ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
+include_directories(include better-enums json/include SYSTEM ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
 add_subdirectory(json)
 
 set(HEADERS
