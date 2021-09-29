@@ -21,7 +21,9 @@ class FTXClient {
 public:
     FTXClient(const std::string &apiKey, const std::string &apiSecret, const std::string &subAccountName);
 
-    Account getAccountInfo();
+    FTXAccount getAccountInfo();
+
+    std::vector<FTXPosition> getPositions();
 };
 
 #endif //FTX_ZORRO_PLUGIN_FTXCLIENT_H

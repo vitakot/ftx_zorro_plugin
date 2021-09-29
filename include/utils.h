@@ -18,7 +18,7 @@ using Clock = std::chrono::system_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 
 template<typename ValueType>
-bool readValue(const nlohmann::json &json, const std::string &key, ValueType &value, bool canThrow = true) {
+bool readValue(const nlohmann::json &json, const std::string &key, ValueType &value, bool canThrow = false) {
     nlohmann::json::const_iterator it;
 
     it = json.find(key);
@@ -40,7 +40,7 @@ bool readValue(const nlohmann::json &json, const std::string &key, ValueType &va
 }
 
 template<typename ValueType>
-bool readEnum(const nlohmann::json &json, const std::string &key, ValueType &value, bool canThrow = true) {
+bool readEnum(const nlohmann::json &json, const std::string &key, ValueType &value, bool canThrow = false) {
     nlohmann::json::const_iterator it;
 
     it = json.find(key);

@@ -40,13 +40,20 @@ void FTXPosition::fromJson(const nlohmann::json &json) {
     readEnum<Side>(json, "side", m_side);
     readValue<double>(json, "size", m_size);
     readValue<double>(json, "unrealizedPnl", m_unrealizedPnl);
+    readValue<double>(json, "cumulativeBuySize", m_cumulativeBuySize);
+    readValue<double>(json, "cumulativeSellSize", m_cumulativeSellSize);
+    readValue<double>(json, "estimatedLiquidationPrice", m_estimatedLiquidationPrice);
+    readValue<double>(json, "recentAverageOpenPrice", m_recentAverageOpenPrice);
+    readValue<double>(json, "recentBreakEvenPrice", m_recentBreakEvenPrice);
+    readValue<double>(json, "recentPnl", m_recentPnl);
+    readValue<double>(json, "collateralUsed", m_collateralUsed);
 }
 
-nlohmann::json Account::toJson() const {
-    throw std::exception("Unimplemented: Account::toJson()");
+nlohmann::json FTXAccount::toJson() const {
+    throw std::exception("Unimplemented: FTXAccount::toJson()");
 }
 
-void Account::fromJson(const nlohmann::json &json) {
+void FTXAccount::fromJson(const nlohmann::json &json) {
 
     m_positions.clear();
 
@@ -72,4 +79,12 @@ void Account::fromJson(const nlohmann::json &json) {
         ftxPosition.fromJson(el);
         m_positions.push_back(ftxPosition);
     }
+}
+
+nlohmann::json FTXOrder::toJson() const {
+    throw std::exception("Unimplemented: Order::toJson()");
+}
+
+void FTXOrder::fromJson(const nlohmann::json &json) {
+
 }

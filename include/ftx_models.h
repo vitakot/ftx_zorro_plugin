@@ -43,13 +43,20 @@ struct FTXPosition : public IJson {
     Side m_side = Side::Buy;
     double m_size = 0.0;
     double m_unrealizedPnl = 0.0;
+    double m_cumulativeBuySize = 0.0;
+    double m_cumulativeSellSize = 0.0;
+    double m_estimatedLiquidationPrice = 0.0;
+    double m_recentAverageOpenPrice = 0.0;
+    double m_recentBreakEvenPrice = 0.0;
+    double m_recentPnl = 0.0;
+    double m_collateralUsed = 0.0;
 
     [[nodiscard]] nlohmann::json toJson() const override;
 
     void fromJson(const nlohmann::json &json) override;
 };
 
-struct Account : public IJson {
+struct FTXAccount : public IJson {
 
     bool m_backstopProvider = false;
     double m_collateral = 0.0;
@@ -66,6 +73,32 @@ struct Account : public IJson {
     double m_totalPositionSize = 0.0;
     std::string m_userName;
     std::vector<FTXPosition> m_positions;
+
+    [[nodiscard]] nlohmann::json toJson() const override;
+
+    void fromJson(const nlohmann::json &json) override;
+};
+
+struct FTXOrder : public IJson {
+
+//    std::string m_createdAt;
+//    std::string m_
+//    "createdAt": "2019-03-05T09:56:55.728933+00:00",
+//    "filledSize": 10,
+//    "future": "XRP-PERP",
+//    "id": 9596912,
+//    "market": "XRP-PERP",
+//    "price": 0.306525,
+//    "avgFillPrice": 0.306526,
+//    "remainingSize": 31421,
+//    "side": "sell",
+//    "size": 31431,
+//    "status": "open",
+//    "type": "limit",
+//    "reduceOnly": false,
+//    "ioc": false,
+//    "postOnly": false,
+//    "clientId": null
 
     [[nodiscard]] nlohmann::json toJson() const override;
 

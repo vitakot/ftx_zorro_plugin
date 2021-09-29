@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(ftx_zorro_plugin)
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "C:/Users/vitez/Zorro/Plugin")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "C:/Users/vitez/Zorro/Plugin")
+
 set(CMAKE_CXX_STANDARD 17)
 add_definitions(-D_WIN32_WINNT=0x0A00)
 
@@ -17,11 +20,13 @@ set(SOURCES
         src/ftx_client.cpp
         src/utils.cpp
         src/http_session.cpp
-        src/ftx_models.cpp)
+        src/ftx_models.cpp
+        src/stdafx.cpp)
 
-add_library(ftx SHARED ftx.cpp ${SOURCES} ${HEADERS})
+add_library(ftx SHARED dllmain.cpp src/ftx.cpp ${SOURCES} ${HEADERS})
+target_compile_definitions(ftx PUBLIC FTX_DLL_EXPORTS)
 
-add_executable(ftx_test main.cpp ${SOURCES} ${HEADERS})
+#add_executable(ftx_test main.cpp ${SOURCES} ${HEADERS})
 
-target_link_libraries(ftx_test OpenSSL::Crypto OpenSSL::SSL)
+#target_link_libraries(ftx_test OpenSSL::Crypto OpenSSL::SSL)
 target_link_libraries(ftx OpenSSL::Crypto OpenSSL::SSL)
