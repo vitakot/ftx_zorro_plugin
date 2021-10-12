@@ -7,7 +7,6 @@ SPDX-License-Identifier: MIT
 Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 */
 
-#include <iostream>
 #include "ftx_models.h"
 #include "utils.h"
 
@@ -56,9 +55,6 @@ nlohmann::json FTXAccount::toJson() const {
 void FTXAccount::fromJson(const nlohmann::json &json) {
 
     m_positions.clear();
-
-    std::string prd = json.dump(4);
-
     readValue<bool>(json, "backstopProvider", m_backstopProvider);
     readValue<double>(json, "collateral", m_collateral);
     readValue<double>(json, "freeCollateral", m_freeCollateral);
@@ -82,9 +78,79 @@ void FTXAccount::fromJson(const nlohmann::json &json) {
 }
 
 nlohmann::json FTXOrder::toJson() const {
-    throw std::exception("Unimplemented: Order::toJson()");
+    throw std::exception("Unimplemented: FTXOrder::toJson()");
 }
 
 void FTXOrder::fromJson(const nlohmann::json &json) {
 
+}
+
+nlohmann::json FTXMarket::toJson() const {
+    throw std::exception("Unimplemented: FTXMarket::toJson()");
+}
+
+void FTXMarket::fromJson(const nlohmann::json &json) {
+    readValue<std::string>(json, "name", m_name);
+    readValue<std::string>(json, "baseCurrency", m_baseCurrency);
+    readValue<std::string>(json, "quoteCurrency", m_quoteCurrency);
+    readValue<double>(json, "quoteVolume24h", m_quoteVolume24h);
+    readValue<double>(json, "change1h", m_change1h);
+    readValue<double>(json, "change24h", m_change24h);
+    readValue<double>(json, "changeBod", m_changeBod);
+    readValue<bool>(json, "highLeverageFeeExempt", m_highLeverageFeeExempt);
+    readValue<double>(json, "minProvideSize", m_minProvideSize);
+    readEnum<MarketType>(json, "type", m_type);
+    readValue<std::string>(json, "underlying", m_underlying);
+    readValue<bool>(json, "enabled", m_enabled);
+    readValue<double>(json, "ask", m_ask);
+    readValue<double>(json, "bid", m_bid);
+    readValue<double>(json, "last", m_last);
+    readValue<bool>(json, "postOnly", m_postOnly);
+    readValue<double>(json, "price", m_price);
+    readValue<double>(json, "priceIncrement", m_priceIncrement);
+    readValue<double>(json, "sizeIncrement", m_sizeIncrement);
+    readValue<bool>(json, "restricted", m_restricted);
+    readValue<double>(json, "volumeUsd24h", m_volumeUsd24h);
+}
+
+nlohmann::json FTXMarkets::toJson() const {
+    throw std::exception("Unimplemented: FTXMarkets::toJson()");
+}
+
+void FTXMarkets::fromJson(const nlohmann::json &json) {
+
+    m_markets.clear();
+
+    for (const auto &el: json) {
+        FTXMarket market;
+        market.fromJson(el);
+        m_markets.push_back(market);
+    }
+}
+
+nlohmann::json FTXCandle::toJson() const {
+    throw std::exception("Unimplemented: FTXCandle::toJson()");
+}
+
+void FTXCandle::fromJson(const nlohmann::json &json) {
+    readValue<double>(json, "open", m_open);
+    readValue<double>(json, "high", m_high);
+    readValue<double>(json, "low", m_low);
+    readValue<double>(json, "close", m_close);
+    readValue<double>(json, "volume", m_volume);
+    readValue<std::string>(json, "startTime", m_startTime);
+}
+
+nlohmann::json FTXCandles::toJson() const {
+    throw std::exception("Unimplemented: FTXCandles::toJson()");
+}
+
+void FTXCandles::fromJson(const nlohmann::json &json) {
+    m_candles.clear();
+
+    for (const auto &el: json) {
+        FTXCandle candle;
+        candle.fromJson(el);
+        m_candles.push_back(candle);
+    }
 }

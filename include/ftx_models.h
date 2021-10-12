@@ -15,8 +15,13 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #include "enum.h"
 
 BETTER_ENUM(Side, std::int32_t,
-            Sell,
-            Buy
+            sell,
+            buy
+)
+
+BETTER_ENUM(MarketType, std::int32_t,
+            spot,
+            future
 )
 
 struct FTXResponse : public IJson {
@@ -40,7 +45,7 @@ struct FTXPosition : public IJson {
     double m_openSize = 0.0;
     double m_realizedPnl = 0.0;
     double m_shortOrderSize = 0.0;
-    Side m_side = Side::Buy;
+    Side m_side = Side::buy;
     double m_size = 0.0;
     double m_unrealizedPnl = 0.0;
     double m_cumulativeBuySize = 0.0;
@@ -99,6 +104,65 @@ struct FTXOrder : public IJson {
 //    "ioc": false,
 //    "postOnly": false,
 //    "clientId": null
+
+    [[nodiscard]] nlohmann::json toJson() const override;
+
+    void fromJson(const nlohmann::json &json) override;
+};
+
+struct FTXMarket : public IJson {
+
+    std::string m_name;
+    std::string m_baseCurrency;
+    std::string m_quoteCurrency;
+    double m_quoteVolume24h = 0.0;
+    double m_change1h = 0.0;
+    double m_change24h = 0.0;
+    double m_changeBod = 0.0;
+    bool m_highLeverageFeeExempt = false;
+    double m_minProvideSize = 0.0;
+    MarketType m_type = MarketType::spot;
+    std::string m_underlying;
+    bool m_enabled = false;
+    double m_ask = 0.0;
+    double m_bid = 0.0;
+    double m_last = 0.0;
+    bool m_postOnly = false;
+    double m_price = 0.0;
+    double m_priceIncrement = 0.0;
+    double m_sizeIncrement = 0.0;
+    bool m_restricted = false;
+    double m_volumeUsd24h = 0.0;
+
+    [[nodiscard]] nlohmann::json toJson() const override;
+
+    void fromJson(const nlohmann::json &json) override;
+};
+
+struct FTXMarkets : public IJson {
+    std::vector<FTXMarket> m_markets;
+
+    [[nodiscard]] nlohmann::json toJson() const override;
+
+    void fromJson(const nlohmann::json &json) override;
+};
+
+struct FTXCandle : public IJson {
+
+    std::string m_startTime;
+    double m_open = 0.0;
+    double m_high = 0.0;
+    double m_low = 0.0;
+    double m_close = 0.0;
+    double m_volume = 0.0;
+
+    [[nodiscard]] nlohmann::json toJson() const override;
+
+    void fromJson(const nlohmann::json &json) override;
+};
+
+struct FTXCandles : public IJson {
+    std::vector<FTXCandle> m_candles;
 
     [[nodiscard]] nlohmann::json toJson() const override;
 

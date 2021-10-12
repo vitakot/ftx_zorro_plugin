@@ -22,15 +22,15 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #define DLLFUNC_C extern "C" __declspec(dllimport)
 #endif
 
-int (__cdecl *BrokerError)(const char *txt) = NULL;
+int (__cdecl *BrokerError)(const char *txt) = nullptr;
 
-int (__cdecl *BrokerProgress)(const int percent) = NULL;
+int (__cdecl *BrokerProgress)(const int percent) = nullptr;
 
-int (__cdecl *http_send)(char *url, char *data, char *header) = NULL;
+int (__cdecl *http_send)(char *url, char *data, char *header) = nullptr;
 
-long (__cdecl *http_status)(int id) = NULL;
+long (__cdecl *http_status)(int id) = nullptr;
 
-long (__cdecl *http_result)(int id, char *content, long size) = NULL;
+long (__cdecl *http_result)(int id, char *content, long size) = nullptr;
 
 void (__cdecl *http_free)(int id);
 

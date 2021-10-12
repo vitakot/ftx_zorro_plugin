@@ -9,49 +9,87 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 
 #include "stdafx.h"
 #include "ftx.h"
-#include "sha256.h"
 #include <wtypes.h>
 #include <string>
+#include <ftx_client.h>
+#include <fstream>
 
 #define PLUGIN_VERSION    2
 
-std::string consumerKey;
-std::string consumerSecret;
-std::string accountId;
+bool verbose = true;
+std::unique_ptr<FTXClient> ftxClient;
 
-enum class HTTPMethod : int {
-    Get = 0,
-    Post,
-    Delete
-};
+bool httpGetMethod(const std::string &url, const std::string &header, std::string &response) {
 
-/**
- * Prepare request header - each request must contain encrypted credentials
- */
-std::string createHeader(std::string) {
-//    std::string method(req.method_string());
-//    std::string path(req.target());
-//    std::string body(req.body());
-//
-//    auto ts = getMsTimestamp(currentTime()).count();
-//    std::string data = std::to_string(ts) + method + path;
-//
-//    if (!body.empty()) {
-//        data += body;
-//    }
-//
-//    std::string hmaStr = hmacString(std::string(m_apiSecret), data, 32);
-//    std::string sign = stringToHex((unsigned char *) hmaStr.c_str(), 32);
-//
-//    req.set("FTX-KEY", m_apiKey);
-//    req.set("FTX-TS", std::to_string(ts));
-//    req.set("FTX-SIGN", sign);
-//
-//    if (!m_subAccountName.empty()) {
-//        req.set("FTX-SUBACCOUNT", m_subAccountName);
-//    }
+    int n;
+    int id = http_send(const_cast<char *>(url.data()), nullptr, const_cast<char *>(header.data()));
 
-    return "";
+    if (!id) {
+        if (verbose) {
+            BrokerError("\nError: Cannot connect to server.");
+            // TODO: log
+        }
+        return true;
+    }
+
+    while (!http_status(id)) {
+        Sleep(100); // wait for the server to reply
+        if (!BrokerProgress(1)) {
+            if (verbose) {
+                BrokerError("\nBrokerProgress returned zero. Aborting...");
+            }
+            http_free(id); //always clean up the id!
+            return false; //failure
+        } // print dots, abort if returns zero.
+    }
+
+    n = http_status(id);
+
+    if (n > 0)  //transfer successful?
+    {
+        char *output;
+        output = (char *) malloc(n + 1);
+        http_result(id, output, n);   //get the replied IP
+        response = output;
+        free(output); //free up memory allocation
+        http_free(id); //always clean up the id!
+
+        // HACK - trim off odd characters at end of message, up to five attempts
+//        for (int ii = 1; ii<= 5; ii++)
+//        {
+//            if (Output->substr(Output->length()-1, 1) == ">") break;
+//
+//            //*Output = Output->substr(0, Output->length() - 1);
+//            Output->pop_back();
+//        }
+
+//        if (IsQuotaExceeded(*Output))
+//        {
+//            if (!quota_exceeded) {
+//                BrokerError("Quota exceeded! Please wait...");
+//                quota_exceeded = true;
+//            }
+//            if (!BrokerProgress(1))
+//            {
+//                if (diag)BrokerError("\nBrokerprogress returned zero. Aborting...");
+//                http_free(id); //always clean up the id!
+//                return 0; //failure
+//            }
+//            *Output = "";
+//            //if (diag)BrokerError("Trying again..");
+//            Sleep(INTERVAL_QUOTA_EXCEEDED_MS);
+//            continue;
+//        }
+
+        return true; //success
+    } else {
+        if (verbose) {
+            BrokerError("\nError during transfer from server.");
+            // TODO: log
+        }
+        http_free(id); //always clean up the id!
+        return false; //failure
+    }
 }
 
 DLLFUNC_C int BrokerOpen(char *Name, FARPROC fpError, FARPROC fpProgress) {
@@ -71,45 +109,31 @@ DLLFUNC_C void BrokerHTTP(FARPROC fpSend, FARPROC fpStatus, FARPROC fpResult, FA
 DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
 
     if (!User) {
-        // log out
         return 0;
     } else if (((std::string) Type) == "Demo") {
-        BrokerError("Demo mode not supported by this plugin.");
+        BrokerError("\nDemo mode not supported by this plugin.");
         return 0;
     } else {
-        // Username is being provided
-        if (accountId.empty()) {
-            accountId = User;
-        }
-        if (consumerKey.empty() || consumerSecret.empty()) {
-            std::string pwd;
-            pwd = Pwd;
-            if ((pwd.length() % 4 == 0) && (pwd.length() > 0)) {
-                auto len = pwd.length() / 4;
-                consumerKey = pwd.substr(0, len);
-                consumerSecret = pwd.substr(1 * len, len);
+        if (!ftxClient) {
+            if (!std::string_view(User).empty() && !std::string_view(Pwd).empty()) {
+                ftxClient = std::make_unique<FTXClient>(User, Pwd, Account);
+                ftxClient->setHttpGetMethod(httpGetMethod);
             } else {
-                BrokerError(
-                        "Error: Password must be divisible \n\ninto four equal strings.\n\nThe password is: consumerKey,consumerSecret,\n\noauthToken,oauthTokenSecret \n\nwith each item back-to-back (no commas).");
+                BrokerError("\nError: Missing or Incomplete Account credentials.");
                 return 0;
             }
+        } else {
+            ftxClient->setCredentials(User, Pwd, Account);
         }
     }
 
-//    std::string response;
-//    if (!GetResponse(&response, HGET, ACCOUNTS_ID_BALANCES, XML, "", "")) {
-//        return 0;
-//    }
-//
-//    if (diag) {
-//        SaveMessage(response, "BrokerLogin");
-//    }
-//
-//    if (ConfirmAccount(response)) {
-//        return 1; // success!
-//    } else {
-//        return 0;
-//    }
+    try {
+        ftxClient->getAccountInfo();
+        // TODO: Log
+    }
+    catch (std::exception &e) {
+        return 0;
+    }
 
     return 0;
 }
@@ -118,8 +142,9 @@ DLLFUNC_C int BrokerTime(DATE *pTimeGMT) {
     return 0;
 }
 
-DLLFUNC_C int BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, double *pPip, double *pPipCost,
-                          double *pLotAmount, double *pMarginCost, double *pRollLong, double *pRollShort) {
+DLLFUNC_C int
+BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, double *pPip, double *pPipCost,
+            double *pLotAmount, double *pMarginCost, double *pRollLong, double *pRollShort) {
     return 0;
 }
 
@@ -131,5 +156,11 @@ DLLFUNC_C int BrokerBuy(char *Asset, int nAmount, double dStopDist, double *pPri
     return 0;
 }
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
+
+    switch (Command) {
+        case SET_DELAY:
+            break;
+    }
+
     return 0;
 }

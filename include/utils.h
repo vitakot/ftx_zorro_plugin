@@ -17,6 +17,8 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 using Clock = std::chrono::system_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 
+constexpr char hexMap[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
 template<typename ValueType>
 bool readValue(const nlohmann::json &json, const std::string &key, ValueType &value, bool canThrow = false) {
     nlohmann::json::const_iterator it;
@@ -67,6 +69,15 @@ inline TimePoint currentTime() {
 
 inline std::chrono::milliseconds getMsTimestamp(TimePoint time) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
+}
+
+inline std::string stringToHex(const unsigned char *data, std::size_t len) {
+    std::string s(len * 2, ' ');
+    for (std::size_t i = 0; i < len; ++i) {
+        s[2 * i] = hexMap[(data[i] & 0xF0) >> 4];
+        s[2 * i + 1] = hexMap[data[i] & 0x0F];
+    }
+    return s;
 }
 
 #endif //FTX_ZORRO_PLUGIN_UTILS_H
