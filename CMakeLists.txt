@@ -10,6 +10,7 @@ add_definitions(-D_WIN32_WINNT=0x0A00)
 
 include_directories(include better-enums json/include SYSTEM ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
 add_subdirectory(json)
+add_subdirectory(spdlog)
 
 set(HEADERS
         include/i_json.h
@@ -27,4 +28,4 @@ set(SOURCES
 add_library(ftx SHARED dllmain.cpp src/ftx.cpp ${SOURCES} ${HEADERS})
 target_compile_definitions(ftx PUBLIC FTX_DLL_EXPORTS)
 
-target_link_libraries(ftx)
+target_link_libraries(ftx spdlog)
