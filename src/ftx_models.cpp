@@ -48,6 +48,20 @@ void FTXPosition::fromJson(const nlohmann::json &json) {
     readValue<double>(json, "collateralUsed", m_collateralUsed);
 }
 
+nlohmann::json FTXPositions::toJson() const {
+    throw std::exception("Unimplemented: FTXPositions::toJson()");
+}
+
+void FTXPositions::fromJson(const nlohmann::json &json) {
+    m_positions.clear();
+
+    for (const auto &el: json) {
+        FTXPosition market;
+        market.fromJson(el);
+        m_positions.push_back(market);
+    }
+}
+
 nlohmann::json FTXAccount::toJson() const {
     throw std::exception("Unimplemented: FTXAccount::toJson()");
 }

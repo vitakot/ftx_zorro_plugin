@@ -17,18 +17,16 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 const char *API_URI = "ftx.com";
 
 template<typename ValueType>
-ValueType handleFTXResponse(const std::string &response) {
+std::optional<ValueType> handleFTXResponse(const std::string &response) {
     ValueType retVal;
     FTXResponse ftxResponse;
     ftxResponse.fromJson(nlohmann::json::parse(response));
 
     if (ftxResponse.m_success) {
         retVal.fromJson(ftxResponse.m_result);
-    } else {
-        throw std::exception("Bad FTXResponse: success == false");
     }
 
-    return retVal;
+    return {};
 }
 
 FTXClient::FTXClient(const std::string &apiKey, const std::string &apiSecret, const std::string &subAccountName) {
@@ -74,11 +72,12 @@ std::string FTXClient::createHeader(const std::string &method, const std::string
     return headerStream.str();
 }
 
-FTXAccount FTXClient::getAccountInfo() {
+std::optional<FTXAccount> FTXClient::getAccountInfo() const {
 
-    std::string header = createHeader("GET", "/api/account", std::string());
     std::string response;
-    std::string url = std::string(API_URI) + "/api/account";
+    std::string path = "/api/account";
+    std::string header = createHeader("GET", path, std::string());
+    std::string url = std::string(API_URI) + path;
 
     if (m_httpGetMethod(url, header, response)) {
         return handleFTXResponse<FTXAccount>(response);
@@ -87,27 +86,44 @@ FTXAccount FTXClient::getAccountInfo() {
     }
 }
 
-//std::vector<FTXPosition> FTXClient::getPositions() {
-//
-//    std::vector<FTXPosition> retVal;
-//    const auto response = checkResponse(m_httpSession->methodGet("positions"));
-//    return retVal;
-//}
-//
-//std::vector<FTXMarket> FTXClient::getMarkets() {
-//    const auto response = checkResponse(m_httpSession->methodGet("markets"));
-//    const auto markets = handleFTXResponse<FTXMarkets>(response);
-//    return markets.m_markets;
-//}
-//
-//std::vector<FTXCandle>
-//FTXClient::getHistoricalPrices(const std::string &marketName, std::int32_t resolutionInSecs, std::int64_t from,
-//                               std::int64_t to) {
-//    std::vector<FTXCandle> retVal;
-//    std::stringstream pathStream;
-//    pathStream << "markets/" << marketName << "/candles" << "?resolution=" << resolutionInSecs << "&start_time=" << from
-//               << "&end_time=" << to;
-//    const auto response = checkResponse(m_httpSession->methodGet(pathStream.str()));
-//    const auto candles = handleFTXResponse<FTXCandles>(response);
-//    return candles.m_candles;
-//}
+std::optional<FTXMarket> FTXClient::getMarket(const std::string &name) const {
+
+    std::string response;
+    std::string path = "/api/markets/" + name;
+    std::string header = createHeader("GET", path, std::string());
+    std::string url = std::string(API_URI) + path;
+
+    if (m_httpGetMethod(url, header, response)) {
+        return handleFTXResponse<FTXMarket>(response);
+    } else {
+        throw std::exception("HTTP Get Method failed.");
+    }
+}
+
+std::optional<FTXPosition> FTXClient::getPosition(const std::string &symbol) const {
+
+    // FTX API does not provide an endpoint for a single position
+    const auto positions = getPositions();
+
+    for(const auto &position : positions){
+        if(position.m_future == symbol){
+            return position;
+        }
+    }
+
+    return {};
+}
+
+std::vector<FTXPosition> FTXClient::getPositions() const {
+    std::string response;
+    std::string path = "/api/positions";
+    std::string header = createHeader("GET", path, std::string());
+    std::string url = std::string(API_URI) + path;
+
+    if (m_httpGetMethod(url, header, response)) {
+        const auto responseData = handleFTXResponse<FTXPositions>(response);
+        return (*responseData).m_positions;
+    } else {
+        throw std::exception("HTTP Get Method failed.");
+    }
+}

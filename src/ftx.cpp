@@ -129,23 +129,83 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
 
     try {
         ftxClient->getAccountInfo();
-        // TODO: Log
+        return 1;
     }
     catch (std::exception &e) {
+        // TODO: Log
         return 0;
     }
-
-    return 0;
-}
-
-DLLFUNC_C int BrokerTime(DATE *pTimeGMT) {
-    return 0;
 }
 
 DLLFUNC_C int
 BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, double *pPip, double *pPipCost,
             double *pLotAmount, double *pMarginCost, double *pRollLong, double *pRollShort) {
+
+    if (!ftxClient) {
+        // TODO: log
+        return 0;
+    }
+
+    try {
+        const auto market = ftxClient->getMarket(Asset);
+
+        if (market) {
+            if ((*market).m_ask == 0.0 || (*market).m_bid == 0.0) {
+                return 0;
+            }
+
+            if (pPrice) {
+                *pPrice = (*market).m_ask;
+            }
+            if (pSpread) {
+                *pSpread = (*market).m_ask - (*market).m_bid;
+            }
+            if (pVolume) {
+                *pVolume = (*market).m_quoteVolume24h;
+            }
+
+            return 1;
+        }
+    }
+    catch (std::exception &e) {
+        BrokerError("Cannot acquire asset info from server.");
+    }
+
     return 0;
+}
+
+DLLFUNC int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal, double *pdMarginVal) {
+    if (!ftxClient) {
+        return 0;
+    }
+
+    if (!Account || !*Account)
+        Account = "BTC";
+
+//    char* Response = send("v3/account",0,1);
+//    if(!Response) return 0;
+//    parse(Response);
+//    double Balance = 0;
+//    while(1) {
+//        char* Found = parse(NULL,"asset");
+//        if(!Found || !*Found) break;
+//        if(0 == strcmp(Found,Account))
+//            Balance += atof(parse(NULL,"free")); // deposit - exchange - trading
+//    }
+//    if(pdBalance) *pdBalance = Balance;
+//    return Balance > 0.? 1 : 0;
+
+    return 0;
+}
+
+
+DLLFUNC_C int BrokerTime(DATE *pTimeGMT) {
+
+    // TODO: Implement ping
+    if (!ftxClient) {
+        return 0;
+    }
+    return 2;
 }
 
 DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinutes, int nTicks, T6 *ticks) {
@@ -157,9 +217,28 @@ DLLFUNC_C int BrokerBuy(char *Asset, int nAmount, double dStopDist, double *pPri
 }
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
 
+    static std::string currentSymbol;
+
     switch (Command) {
         case SET_DELAY:
             break;
+
+        case SET_SYMBOL:
+            currentSymbol = (char *) dwParameter;
+            return 1;
+        case GET_POSITION:
+            if (ftxClient) {
+                auto position = ftxClient->getPosition(currentSymbol);
+
+                if (position) {
+                    return (*position).m_openSize;
+                }
+            }
+            break;
+        case GET_MAXREQUESTS:
+            return 10;
+        case GET_MAXTICKS:
+            return 500;
     }
 
     return 0;

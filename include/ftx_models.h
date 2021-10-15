@@ -61,6 +61,14 @@ struct FTXPosition : public IJson {
     void fromJson(const nlohmann::json &json) override;
 };
 
+struct FTXPositions : public IJson {
+    std::vector<FTXPosition> m_positions;
+
+    [[nodiscard]] nlohmann::json toJson() const override;
+
+    void fromJson(const nlohmann::json &json) override;
+};
+
 struct FTXAccount : public IJson {
 
     bool m_backstopProvider = false;

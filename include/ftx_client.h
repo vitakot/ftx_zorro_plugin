@@ -14,6 +14,7 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #include <string>
 #include <memory>
 #include <functional>
+#include <optional>
 
 class FTXClient {
 
@@ -37,15 +38,13 @@ public:
 
     void setHttpGetMethod(const std::function<bool(const std::string &, const std::string &, std::string &)> &method);
 
-    FTXAccount getAccountInfo();
+    [[nodiscard]] std::optional<FTXAccount> getAccountInfo() const;
 
-    std::vector<FTXPosition> getPositions();
+    [[nodiscard]] std::optional<FTXMarket> getMarket(const std::string &name) const;
 
-    std::vector<FTXMarket> getMarkets();
+    [[nodiscard]] std::optional<FTXPosition> getPosition(const std::string &symbol) const;
 
-    std::vector<FTXCandle>
-    getHistoricalPrices(const std::string &marketName, std::int32_t resolutionInSecs, std::int64_t from,
-                        std::int64_t to);
+    [[nodiscard]] std::vector<FTXPosition> getPositions() const;
 };
 
 #endif //FTX_ZORRO_PLUGIN_FTXCLIENT_H
