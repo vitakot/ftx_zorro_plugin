@@ -49,13 +49,13 @@ bool readEnum(const nlohmann::json &json, const std::string &key, ValueType &val
 
     if (canThrow) {
         if (!it.value().is_null()) {
-            value = ValueType::_from_string(it->get<std::string>().c_str());
+            value = ValueType::_from_string_nocase(it->get<std::string>().c_str());
         }
         return true;
     } else {
         if (it != json.end()) {
             if (!it.value().is_null()) {
-                value = ValueType::_from_string(it->get<std::string>().c_str());
+                value = ValueType::_from_string_nocase(it->get<std::string>().c_str());
             }
             return true;
         }

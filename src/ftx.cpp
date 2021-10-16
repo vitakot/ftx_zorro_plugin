@@ -13,21 +13,31 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #include <string>
 #include <ftx_client.h>
 #include <fstream>
+#include <spdlog/spdlog.h>
 
 #define PLUGIN_VERSION    2
 
 bool verbose = true;
 std::unique_ptr<FTXClient> ftxClient;
 
-bool httpGetMethod(const std::string &url, const std::string &header, std::string &response) {
-
+bool httpMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
     int n;
-    int id = http_send(const_cast<char *>(url.data()), nullptr, const_cast<char *>(header.data()));
+    int id = 0;
+
+    if(body.empty()) {
+        id = http_send(const_cast<char *>(url.data()), nullptr,
+                           const_cast<char *>(header.data()));
+    }
+    else{
+        id = http_send(const_cast<char *>(url.data()), const_cast<char *>(body.data()),
+                       const_cast<char *>(header.data()));
+    }
 
     if (!id) {
         if (verbose) {
-            BrokerError("\nError: Cannot connect to server.");
-            // TODO: log
+            const auto msg = "Cannot connect to server.";
+            spdlog::error(msg);
+            BrokerError(msg);
         }
         return true;
     }
@@ -36,7 +46,9 @@ bool httpGetMethod(const std::string &url, const std::string &header, std::strin
         Sleep(100); // wait for the server to reply
         if (!BrokerProgress(1)) {
             if (verbose) {
-                BrokerError("\nBrokerProgress returned zero. Aborting...");
+                const auto msg = "BrokerProgress returned zero. Aborting...";
+                spdlog::error(msg);
+                BrokerError(msg);
             }
             http_free(id); //always clean up the id!
             return false; //failure
@@ -53,43 +65,28 @@ bool httpGetMethod(const std::string &url, const std::string &header, std::strin
         response = output;
         free(output); //free up memory allocation
         http_free(id); //always clean up the id!
-
-        // HACK - trim off odd characters at end of message, up to five attempts
-//        for (int ii = 1; ii<= 5; ii++)
-//        {
-//            if (Output->substr(Output->length()-1, 1) == ">") break;
-//
-//            //*Output = Output->substr(0, Output->length() - 1);
-//            Output->pop_back();
-//        }
-
-//        if (IsQuotaExceeded(*Output))
-//        {
-//            if (!quota_exceeded) {
-//                BrokerError("Quota exceeded! Please wait...");
-//                quota_exceeded = true;
-//            }
-//            if (!BrokerProgress(1))
-//            {
-//                if (diag)BrokerError("\nBrokerprogress returned zero. Aborting...");
-//                http_free(id); //always clean up the id!
-//                return 0; //failure
-//            }
-//            *Output = "";
-//            //if (diag)BrokerError("Trying again..");
-//            Sleep(INTERVAL_QUOTA_EXCEEDED_MS);
-//            continue;
-//        }
-
         return true; //success
     } else {
         if (verbose) {
-            BrokerError("\nError during transfer from server.");
-            // TODO: log
+            const auto msg = "Unknown error during transfer from server.";
+            spdlog::error(msg);
+            BrokerError(msg);
         }
         http_free(id); //always clean up the id!
         return false; //failure
     }
+}
+
+bool httpGetMethod(const std::string &url, const std::string &header, std::string &response) {
+    return httpMethod(url, header, "", response);
+}
+
+bool httpDeleteMethod(const std::string &url, const std::string &header, std::string &response) {
+    return httpMethod(url, header, "", response);
+}
+
+bool httpPostMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
+    return httpMethod(url, header, body, response);
 }
 
 DLLFUNC_C int BrokerOpen(char *Name, FARPROC fpError, FARPROC fpProgress) {
@@ -111,15 +108,21 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
     if (!User) {
         return 0;
     } else if (((std::string) Type) == "Demo") {
-        BrokerError("\nDemo mode not supported by this plugin.");
+        const auto msg = "Demo mode not supported by this plugin.";
+        spdlog::error(msg);
+        BrokerError(msg);
         return 0;
     } else {
         if (!ftxClient) {
             if (!std::string_view(User).empty() && !std::string_view(Pwd).empty()) {
                 ftxClient = std::make_unique<FTXClient>(User, Pwd, Account);
                 ftxClient->setHttpGetMethod(httpGetMethod);
+                ftxClient->setHttpDeleteMethod(httpDeleteMethod);
+                ftxClient->setHttpPostMethod(httpPostMethod);
             } else {
-                BrokerError("\nError: Missing or Incomplete Account credentials.");
+                const auto msg = "Missing or Incomplete Account credentials.";
+                spdlog::error(msg);
+                BrokerError(msg);
                 return 0;
             }
         } else {
@@ -128,11 +131,16 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
     }
 
     try {
-        ftxClient->getAccountInfo();
+        const auto account = ftxClient->getAccountInfo();
+        if (!account) {
+            const auto msg = "Cannot log into account: " + std::string(Account) + ".";
+            spdlog::error(msg);
+            return 0;
+        }
         return 1;
     }
     catch (std::exception &e) {
-        // TODO: Log
+        spdlog::error(e.what());
         return 0;
     }
 }
@@ -142,7 +150,7 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
             double *pLotAmount, double *pMarginCost, double *pRollLong, double *pRollShort) {
 
     if (!ftxClient) {
-        // TODO: log
+        spdlog::critical("FTX Client instance not initialized.");
         return 0;
     }
 
@@ -166,8 +174,18 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
 
             return 1;
         }
+
+        auto msg = ftxClient->getlastError();
+
+        if (msg.empty()) {
+            msg = "Cannot acquire asset info from server.";
+            BrokerError(msg.c_str());
+        }
+        spdlog::error(msg);
+        BrokerError(msg.c_str());
     }
     catch (std::exception &e) {
+        spdlog::error(e.what());
         BrokerError("Cannot acquire asset info from server.");
     }
 
@@ -176,24 +194,30 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
 
 DLLFUNC int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal, double *pdMarginVal) {
     if (!ftxClient) {
+        spdlog::critical("FTX Client instance not initialized.");
         return 0;
     }
 
-    if (!Account || !*Account)
-        Account = "BTC";
+    try {
+        const auto account = ftxClient->getAccountInfo();
 
-//    char* Response = send("v3/account",0,1);
-//    if(!Response) return 0;
-//    parse(Response);
-//    double Balance = 0;
-//    while(1) {
-//        char* Found = parse(NULL,"asset");
-//        if(!Found || !*Found) break;
-//        if(0 == strcmp(Found,Account))
-//            Balance += atof(parse(NULL,"free")); // deposit - exchange - trading
-//    }
-//    if(pdBalance) *pdBalance = Balance;
-//    return Balance > 0.? 1 : 0;
+        if (account) {
+            if (pdBalance) {
+                *pdBalance = (*account).m_totalAccountValue;
+            }
+            if (pdTradeVal) {
+                *pdTradeVal = (*account).m_totalPositionSize;
+            }
+            if (pdMarginVal) {
+                // TODO: TBD
+            }
+            return 1;
+        }
+    }
+    catch (std::exception &e) {
+        spdlog::error(e.what());
+        BrokerError("Cannot acquire account info from server.");
+    }
 
     return 0;
 }

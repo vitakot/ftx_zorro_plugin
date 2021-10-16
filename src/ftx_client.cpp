@@ -17,13 +17,16 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 const char *API_URI = "ftx.com";
 
 template<typename ValueType>
-std::optional<ValueType> handleFTXResponse(const std::string &response) {
+std::optional<ValueType> handleFTXResponse(const std::string &response, std::string &errorMsg) {
     ValueType retVal;
     FTXResponse ftxResponse;
     ftxResponse.fromJson(nlohmann::json::parse(response));
 
     if (ftxResponse.m_success) {
         retVal.fromJson(ftxResponse.m_result);
+        return retVal;
+    } else {
+        errorMsg = ftxResponse.m_error;
     }
 
     return {};
@@ -35,9 +38,26 @@ FTXClient::FTXClient(const std::string &apiKey, const std::string &apiSecret, co
     m_subAccountName = subAccountName;
 }
 
+std::string FTXClient::getlastError() const {
+    return m_lastError;
+}
+
 void FTXClient::setHttpGetMethod(
         const std::function<bool(const std::string &, const std::string &, std::string &)> &method) {
+
     m_httpGetMethod = method;
+}
+
+void FTXClient::setHttpDeleteMethod(
+        const std::function<bool(const std::string &, const std::string &, std::string &)> &method) {
+
+    m_httpDeleteMethod = method;
+}
+
+void FTXClient::setHttpPostMethod(
+        const std::function<bool(const std::string &, const std::string &, const std::string &,
+                                 std::string &)> &method) {
+    m_httpPostMethod = method;
 }
 
 void
@@ -80,9 +100,10 @@ std::optional<FTXAccount> FTXClient::getAccountInfo() const {
     std::string url = std::string(API_URI) + path;
 
     if (m_httpGetMethod(url, header, response)) {
-        return handleFTXResponse<FTXAccount>(response);
+        return handleFTXResponse<FTXAccount>(response, m_lastError);
     } else {
-        throw std::exception("HTTP Get Method failed.");
+        m_lastError = "HTTP Get Method failed, path: " + path;
+        throw std::exception(m_lastError.c_str());
     }
 }
 
@@ -94,9 +115,10 @@ std::optional<FTXMarket> FTXClient::getMarket(const std::string &name) const {
     std::string url = std::string(API_URI) + path;
 
     if (m_httpGetMethod(url, header, response)) {
-        return handleFTXResponse<FTXMarket>(response);
+        return handleFTXResponse<FTXMarket>(response, m_lastError);
     } else {
-        throw std::exception("HTTP Get Method failed.");
+        m_lastError = "HTTP Get Method failed, path: " + path;
+        throw std::exception(m_lastError.c_str());
     }
 }
 
@@ -105,25 +127,63 @@ std::optional<FTXPosition> FTXClient::getPosition(const std::string &symbol) con
     // FTX API does not provide an endpoint for a single position
     const auto positions = getPositions();
 
-    for(const auto &position : positions){
-        if(position.m_future == symbol){
-            return position;
+    if (positions) {
+        for (const auto &position: positions.value()) {
+            if (position.m_future == symbol) {
+                return position;
+            }
         }
     }
 
     return {};
 }
 
-std::vector<FTXPosition> FTXClient::getPositions() const {
+std::optional<std::vector<FTXPosition>> FTXClient::getPositions() const {
     std::string response;
     std::string path = "/api/positions";
     std::string header = createHeader("GET", path, std::string());
     std::string url = std::string(API_URI) + path;
 
     if (m_httpGetMethod(url, header, response)) {
-        const auto responseData = handleFTXResponse<FTXPositions>(response);
+        const auto responseData = handleFTXResponse<FTXPositions>(response, m_lastError);
         return (*responseData).m_positions;
     } else {
-        throw std::exception("HTTP Get Method failed.");
+        m_lastError = "HTTP Get Method failed, path: " + path;
+        throw std::exception(m_lastError.c_str());
+    }
+}
+
+std::optional<FTXOrder> FTXClient::placeOrder(const FTXOrder &order) const {
+    return FTXOrder();
+}
+
+bool FTXClient::cancelOrder(std::int32_t id) const {
+    return false;
+}
+
+std::optional<FTXOrder> FTXClient::getOrderStatus(std::int32_t id) const {
+    return std::optional<FTXOrder>();
+}
+
+bool FTXClient::cancelAllOrders(const std::string &market) const {
+    return false;
+}
+
+std::optional<FTXCandles>
+FTXClient::getHistoricalPrices(const std::string &marketName, std::int32_t resolutionInSecs, std::int64_t from,
+                               std::int64_t to) const {
+    std::string response;
+    std::stringstream pathStream;
+    pathStream << "/api/markets/" << marketName << "/candles" << "?resolution=" << resolutionInSecs << "&start_time="
+               << from << "&end_time=" << to;
+
+    std::string header = createHeader("GET", pathStream.str(), std::string());
+    std::string url = std::string(API_URI) + pathStream.str();
+
+    if (m_httpGetMethod(url, header, response)) {
+        return handleFTXResponse<FTXCandles>(response, m_lastError);
+    } else {
+        m_lastError = "HTTP Get Method failed, path: " + pathStream.str();
+        throw std::exception(m_lastError.c_str());
     }
 }

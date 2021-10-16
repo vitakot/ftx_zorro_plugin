@@ -19,7 +19,6 @@ set(HEADERS
         include/ftx.h)
 
 set(SOURCES
-        src/utils.cpp
         src/ftx_models.cpp
         src/ftx_client.cpp
         src/stdafx.cpp

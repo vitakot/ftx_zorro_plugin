@@ -17,7 +17,12 @@ nlohmann::json FTXResponse::toJson() const {
 void FTXResponse::fromJson(const nlohmann::json &json) {
 
     readValue<bool>(json, "success", m_success);
-    m_result = json["result"];
+
+    if (m_success) {
+        m_result = json["result"];
+    } else {
+        readValue<std::string>(json, "error", m_error);
+    }
 }
 
 nlohmann::json FTXPosition::toJson() const {
@@ -96,7 +101,22 @@ nlohmann::json FTXOrder::toJson() const {
 }
 
 void FTXOrder::fromJson(const nlohmann::json &json) {
-
+    readValue<std::string>(json, "createdAt", m_createdAt);
+    readValue<double>(json, "filledSize", m_filledSize);
+    readValue<std::string>(json, "future", m_future);
+    readValue<std::int32_t>(json, "id", m_id);
+    readValue<std::string>(json, "market", m_market);
+    readValue<double>(json, "price", m_price);
+    readValue<double>(json, "avgFillPrice", m_avgFillPrice);
+    readValue<double>(json, "remainingSize", m_remainingSize);
+    readEnum<Side>(json, "side", m_side);
+    readValue<std::int32_t>(json, "size", m_size);
+    readEnum<OrderStatus>(json, "status", m_status);
+    readEnum<OrderType>(json, "type", m_type);
+    readValue<bool>(json, "reduceOnly", m_reduceOnly);
+    readValue<bool>(json, "ioc", m_ioc);
+    readValue<bool>(json, "postOnly", m_postOnly);
+    readValue<std::int32_t>(json, "clientId", m_clientId);
 }
 
 nlohmann::json FTXMarket::toJson() const {
