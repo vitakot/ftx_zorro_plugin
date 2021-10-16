@@ -9,26 +9,32 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 
 #include "stdafx.h"
 #include "ftx.h"
+#include "utils.h"
 #include <wtypes.h>
 #include <string>
 #include <ftx_client.h>
 #include <fstream>
 #include <spdlog/spdlog.h>
+#include <sstream>
+#include <iomanip>
 
 #define PLUGIN_VERSION    2
 
 bool verbose = true;
 std::unique_ptr<FTXClient> ftxClient;
 
+__time32_t convertTime(DATE date) {
+    return (__time32_t) ((date - 25569.) * 24. * 60. * 60.);
+}
+
 bool httpMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
     int n;
     int id = 0;
 
-    if(body.empty()) {
+    if (body.empty()) {
         id = http_send(const_cast<char *>(url.data()), nullptr,
-                           const_cast<char *>(header.data()));
-    }
-    else{
+                       const_cast<char *>(header.data()));
+    } else {
         id = http_send(const_cast<char *>(url.data()), const_cast<char *>(body.data()),
                        const_cast<char *>(header.data()));
     }
@@ -81,8 +87,9 @@ bool httpGetMethod(const std::string &url, const std::string &header, std::strin
     return httpMethod(url, header, "", response);
 }
 
-bool httpDeleteMethod(const std::string &url, const std::string &header, std::string &response) {
-    return httpMethod(url, header, "", response);
+bool
+httpDeleteMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
+    return httpMethod(url, header, body, response);
 }
 
 bool httpPostMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
@@ -233,10 +240,75 @@ DLLFUNC_C int BrokerTime(DATE *pTimeGMT) {
 }
 
 DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinutes, int nTicks, T6 *ticks) {
+
+    if (!Asset || !ticks || !nTicks) {
+        return 0;
+    }
+
+    if (!ftxClient) {
+        spdlog::critical("FTX Client instance not initialized.");
+        return 0;
+    }
+
+    try {
+
+        auto resolution = nTickMinutes * 60;
+
+        if (!FTXClient::isValidCandleResolution(resolution)) {
+            std::string msg = "Invalid data resolution: " + std::to_string(resolution) + ".";
+            spdlog::error(msg);
+            BrokerError(msg.c_str());
+            return 0;
+        }
+
+        auto candles = ftxClient->getHistoricalPrices(Asset, resolution, convertTime(tStart), convertTime(tEnd));
+
+        if (!candles) {
+            std::string msg = "No historical data.";
+            spdlog::error(msg);
+            BrokerError(msg.c_str());
+            return 0;
+        }
+
+        if ((*candles).size() < nTicks) {
+            std::string msg = "Not enough historical data.";
+            spdlog::error(msg);
+            BrokerError(msg.c_str());
+            return 0;
+        }
+
+        (*candles).resize(nTicks);
+
+        for (int i = 0; i < nTicks; i++, ticks++) {
+            ticks->fOpen = static_cast<float>((*candles)[i].m_open);
+            ticks->fHigh = static_cast<float>((*candles)[i].m_high);
+            ticks->fLow = static_cast<float>((*candles)[i].m_low);
+            ticks->fClose = static_cast<float>((*candles)[i].m_close);
+            ticks->fVol = static_cast<float>((*candles)[i].m_volume);
+
+            std::tm candleTime{};
+            std::istringstream ss((*candles)[i].m_startTime);
+            ss >> std::get_time(&candleTime, "%Y-%m-%dT%H:%M:%S:%z");
+            ticks->time = systemTimeToVariantTimeMs(candleTime.tm_year + 1900, candleTime.tm_mon, candleTime.tm_mday,
+                                                    candleTime.tm_hour, candleTime.tm_min, candleTime.tm_sec, 0);
+        }
+    }
+    catch (std::exception &e) {
+        spdlog::error(e.what());
+        BrokerError("Cannot acquire account info from server.");
+    }
+
+
     return 0;
 }
 
 DLLFUNC_C int BrokerBuy(char *Asset, int nAmount, double dStopDist, double *pPrice) {
+
+    if (!ftxClient) {
+        spdlog::critical("FTX Client instance not initialized.");
+        return 0;
+    }
+
     return 0;
 }
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {

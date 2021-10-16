@@ -80,4 +80,19 @@ inline std::string stringToHex(const unsigned char *data, std::size_t len) {
     return s;
 }
 
+inline double systemTimeToVariantTimeMs(const unsigned short year, const unsigned short month, const unsigned short day,
+                                 const unsigned short hour, const unsigned short min, const unsigned short sec,
+                                 const unsigned int msec) {
+    int m12 = (month - 14) / 12;
+    double dateVal =
+            /* Convert Day/Month/Year to a Julian date - from PostgreSQL */
+            (1461 * (year + 4800 + m12)) / 4 + (367 * (month - 2 - 12 * m12)) / 12 -
+            (3 * ((year + 4900 + m12) / 100)) / 4 + day - 32075
+            - 1757585 /* Convert to + days from 1 Jan 100 AD */
+            - 657434; /* Convert to +/- days from 1 Jan 1899 AD */
+    double dateSign = (dateVal < 0.0) ? -1.0 : 1.0;
+    dateVal += dateSign * (msec + sec * 1000 + min * 60000 + hour * 3600000) / 86400000.0;
+    return dateVal;
+}
+
 #endif //FTX_ZORRO_PLUGIN_UTILS_H

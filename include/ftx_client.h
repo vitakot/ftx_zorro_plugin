@@ -31,7 +31,7 @@ class FTXClient {
 
     std::function<bool(const std::string &url, const std::string &header, std::string &response)> m_httpGetMethod;
 
-    std::function<bool(const std::string &url, const std::string &header, std::string &response)> m_httpDeleteMethod;
+    std::function<bool(const std::string &url, const std::string &header,  const std::string &body, std::string &response)> m_httpDeleteMethod;
 
     std::function<bool(const std::string &url, const std::string &header, const std::string &body, std::string &response)> m_httpPostMethod;
 
@@ -43,11 +43,13 @@ public:
 
     void setHttpGetMethod(const std::function<bool(const std::string &, const std::string &, std::string &)> &method);
 
-    void setHttpDeleteMethod(const std::function<bool(const std::string &, const std::string &, std::string &)> &method);
+    void setHttpDeleteMethod(const std::function<bool(const std::string &, const std::string &, const std::string &body, std::string &)> &method);
 
     void setHttpPostMethod(const std::function<bool(const std::string &, const std::string &, const std::string &body, std::string &)> &method);
 
     std::string getlastError() const;
+
+    bool static isValidCandleResolution(std::int32_t resolution);
 
     [[nodiscard]] std::optional<FTXAccount> getAccountInfo() const;
 
@@ -65,7 +67,7 @@ public:
 
     [[nodiscard]] bool cancelAllOrders(const std::string &market) const;
 
-    [[nodiscard]] std::optional<FTXCandles> getHistoricalPrices(const std::string& marketName, std::int32_t resolutionInSecs, std::int64_t from, std::int64_t to) const;
+    [[nodiscard]] std::optional<std::vector<FTXCandle>> getHistoricalPrices(const std::string& marketName, std::int32_t resolutionInSecs, std::int64_t from, std::int64_t to) const;
 };
 
 #endif //FTX_ZORRO_PLUGIN_FTXCLIENT_H
