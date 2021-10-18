@@ -5,7 +5,7 @@ project(ftx_zorro_plugin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "C:/Users/vitez/Zorro/Plugin")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "C:/Users/vitez/Zorro/Plugin")
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 add_definitions(-D_WIN32_WINNT=0x0A00)
 
 include_directories(include better-enums json/include SYSTEM ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})

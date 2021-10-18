@@ -204,10 +204,17 @@ std::optional<FTXOrder> FTXClient::placeOrder(const FTXOrder &order) const {
     }
 }
 
-bool FTXClient::cancelOrder(std::int32_t id) const {
+bool FTXClient::cancelOrder(std::int32_t id, bool isClientId) const {
 
     std::string response;
-    std::string path = "/api/orders/" + std::to_string(id);
+    std::string path;
+
+    if (!isClientId) {
+        path = "/api/orders/" + std::to_string(id);
+    } else {
+        path = "/api/orders/by_client_id/" + std::to_string(id);
+    }
+
     std::string header = createHeader("DELETE", path, std::string());
     std::string url = std::string(API_URI) + path;
 

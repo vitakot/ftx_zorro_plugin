@@ -13,18 +13,25 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #include <wtypes.h>
 #include <string>
 #include <ftx_client.h>
-#include <fstream>
 #include <spdlog/spdlog.h>
-#include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 #define PLUGIN_VERSION    2
+#undef min
 
 bool verbose = true;
-std::unique_ptr<FTXClient> ftxClient;
 
-__time32_t convertTime(DATE date) {
-    return (__time32_t) ((date - 25569.) * 24. * 60. * 60.);
+static std::string currentSymbol;
+static int lastOrderId = 0;
+static int orderType = 0;
+static double lotAmount = 1.0;
+static int loopMs = 50;     // Actually unused
+static int waitMs = 30000;  // Actually unused
+static std::unique_ptr<FTXClient> ftxClient;
+
+__int64 convertTime(DATE Date) {
+    return (__int64) ((Date - 25569.) * 24. * 60. * 60.);
 }
 
 bool httpMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
@@ -126,6 +133,11 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
                 ftxClient->setHttpGetMethod(httpGetMethod);
                 ftxClient->setHttpDeleteMethod(httpDeleteMethod);
                 ftxClient->setHttpPostMethod(httpPostMethod);
+
+                time_t Time;
+                time(&Time);
+                lastOrderId = (int) Time;
+
             } else {
                 const auto msg = "Missing or Incomplete Account credentials.";
                 spdlog::error(msg);
@@ -199,7 +211,7 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
     return 0;
 }
 
-DLLFUNC int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal, double *pdMarginVal) {
+DLLFUNC_C int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal, double *pdMarginVal) {
     if (!ftxClient) {
         spdlog::critical("FTX Client instance not initialized.");
         return 0;
@@ -210,13 +222,7 @@ DLLFUNC int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal, 
 
         if (account) {
             if (pdBalance) {
-                *pdBalance = (*account).m_totalAccountValue;
-            }
-            if (pdTradeVal) {
-                *pdTradeVal = (*account).m_totalPositionSize;
-            }
-            if (pdMarginVal) {
-                // TODO: TBD
+                *pdBalance = std::round((*account).m_totalAccountValue);
             }
             return 1;
         }
@@ -229,10 +235,8 @@ DLLFUNC int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal, 
     return 0;
 }
 
-
 DLLFUNC_C int BrokerTime(DATE *pTimeGMT) {
 
-    // TODO: Implement ping
     if (!ftxClient) {
         return 0;
     }
@@ -270,16 +274,11 @@ DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinut
             return 0;
         }
 
-        if ((*candles).size() < nTicks) {
-            std::string msg = "Not enough historical data.";
-            spdlog::error(msg);
-            BrokerError(msg.c_str());
-            return 0;
-        }
+        const auto maxCandles = std::min(nTicks, (int) (*candles).size());
+        std::reverse((*candles).begin(), (*candles).end());
 
-        (*candles).resize(nTicks);
-
-        for (int i = 0; i < nTicks; i++, ticks++) {
+        // From most recent to oldest.
+        for (int i = 0; i < maxCandles; i++, ticks++) {
             ticks->fOpen = static_cast<float>((*candles)[i].m_open);
             ticks->fHigh = static_cast<float>((*candles)[i].m_high);
             ticks->fLow = static_cast<float>((*candles)[i].m_low);
@@ -289,52 +288,138 @@ DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinut
             std::tm candleTime{};
             std::istringstream ss((*candles)[i].m_startTime);
             ss >> std::get_time(&candleTime, "%Y-%m-%dT%H:%M:%S:%z");
-            ticks->time = systemTimeToVariantTimeMs(candleTime.tm_year + 1900, candleTime.tm_mon, candleTime.tm_mday,
+            ticks->time = systemTimeToVariantTimeMs(candleTime.tm_year + 1900, candleTime.tm_mon + 1,
+                                                    candleTime.tm_mday,
                                                     candleTime.tm_hour, candleTime.tm_min, candleTime.tm_sec, 0);
         }
+
+        return maxCandles;
     }
     catch (std::exception &e) {
         spdlog::error(e.what());
-        BrokerError("Cannot acquire account info from server.");
+        BrokerError("Cannot acquire historical data from server.");
     }
-
 
     return 0;
 }
 
-DLLFUNC_C int BrokerBuy(char *Asset, int nAmount, double dStopDist, double *pPrice) {
+DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit, double *pPrice, int *pFill) {
 
     if (!ftxClient) {
         spdlog::critical("FTX Client instance not initialized.");
         return 0;
+    }
+    try {
+
+        FTXOrder order;
+        order.m_market = Asset;
+
+        if (Amount > 0) {
+            order.m_side = Side::Buy;
+        } else {
+            order.m_side = Side::Sell;
+        }
+
+        if (Limit > 0.) {
+            order.m_price = Limit;
+            order.m_type = OrderType::Limit;
+        } else {
+            order.m_type = OrderType::Market;
+        }
+
+        order.m_size = lotAmount * std::abs(Amount);
+
+        if (orderType == 1) {
+            order.m_ioc = true;
+        }
+
+        order.m_clientId = lastOrderId++;
+
+        const auto confirmedOrder = ftxClient->placeOrder(order);
+
+        if (!confirmedOrder) {
+            std::string msg = "Cannot place order: " + std::string(Asset) + ", size: " + std::to_string(Amount);
+            spdlog::error(msg);
+            BrokerError(msg.c_str());
+            return 0;
+        }
+
+        if (pPrice) {
+            *pPrice = confirmedOrder->m_price;
+        }
+        if (pFill) {
+            *pFill = confirmedOrder->m_filledSize/lotAmount;
+        }
+
+        return confirmedOrder->m_clientId;
+    }
+    catch (std::exception &e) {
+        spdlog::error(e.what());
+        BrokerError("Cannot send order to server.");
     }
 
     return 0;
 }
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
 
-    static std::string currentSymbol;
-
     switch (Command) {
+        case SET_ORDERTYPE:
+            return orderType = dwParameter;
         case SET_DELAY:
-            break;
-
+            loopMs = dwParameter;
+        case GET_DELAY:
+            return loopMs;
+        case SET_AMOUNT:
+            lotAmount = *(double *) dwParameter;
+            return 1;
+        case SET_WAIT:
+            waitMs = dwParameter;
+        case GET_WAIT:
+            return waitMs;
         case SET_SYMBOL:
             currentSymbol = (char *) dwParameter;
             return 1;
         case GET_POSITION:
             if (ftxClient) {
-                auto position = ftxClient->getPosition(currentSymbol);
+                try {
+                    auto position = ftxClient->getPosition(currentSymbol);
 
-                if (position) {
-                    return (*position).m_openSize;
+                    if (position) {
+                        return (*position).m_openSize;
+                    }
+                }
+                catch (std::exception &e) {
+                    spdlog::error(e.what());
+                    BrokerError((std::string("Cannot get position of " + currentSymbol).c_str()));
                 }
             }
             break;
         case GET_MAXREQUESTS:
             return 10;
         case GET_MAXTICKS:
-            return 500;
+            return 250;
+        case GET_COMPLIANCE:
+            return 2; // No hedging
+        case DO_CANCEL:
+            if (ftxClient) {
+                try {
+                    auto retVal = ftxClient->cancelOrder(dwParameter, true);
+
+                    if (!retVal) {
+                        BrokerError((std::string("Cannot cancel order id " + std::to_string(dwParameter)).c_str()));
+                        return 0;
+                    }
+                    return 1;
+                }
+                catch (std::exception &e) {
+                    spdlog::error(e.what());
+                    BrokerError((std::string("Cannot cancel order id " + std::to_string(dwParameter)).c_str()));
+                }
+            }
+            break;
+
+        default:
+            return 0;
     }
 
     return 0;

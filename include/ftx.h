@@ -43,7 +43,8 @@ DLLFUNC_C int BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *
                           double *pLotAmount, double *pMarginCost, double *pRollLong, double *pRollShort);
 DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinutes, int nTicks,
                              T6 *ticks);  // only supports stocks, no option history available.
-DLLFUNC_C int BrokerBuy(char *Asset, int nAmount, double dStopDist, double *pPrice);
+DLLFUNC_C int BrokerBuy2(char* Asset,int Amount,double dStopDist,double Limit,double *pPrice,int *pFill);
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter);
+DLLFUNC_C int BrokerAccount(char* Account,double *pdBalance,double *pdTradeVal,double *pdMarginVal);
 
 #endif //FTX_ZORRO_PLUGIN_FTX_H

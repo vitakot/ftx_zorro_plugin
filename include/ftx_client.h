@@ -61,7 +61,7 @@ public:
 
     [[nodiscard]] std::optional<FTXOrder> placeOrder(const FTXOrder &order) const;
 
-    [[nodiscard]] bool cancelOrder(std::int32_t id) const;
+    [[nodiscard]] bool cancelOrder(std::int32_t id, bool isClientId = false) const;
 
     [[nodiscard]] std::optional<FTXOrder> getOrderStatus(std::int32_t id) const;
 
