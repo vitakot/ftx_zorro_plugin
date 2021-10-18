@@ -14,6 +14,7 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #include <string>
 #include <ftx_client.h>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <iomanip>
 #include <algorithm>
 
@@ -128,6 +129,11 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
         return 0;
     } else {
         if (!ftxClient) {
+
+            auto logger = spdlog::basic_logger_mt("ftx_logger", R"(C:\Users\vitez\Zorro\Plugin\ftx.log)");
+            spdlog::set_default_logger(logger);
+            spdlog::flush_on(spdlog::level::info);
+
             if (!std::string_view(User).empty() && !std::string_view(Pwd).empty()) {
                 ftxClient = std::make_unique<FTXClient>(User, Pwd, Account);
                 ftxClient->setHttpGetMethod(httpGetMethod);
@@ -137,7 +143,7 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
                 time_t Time;
                 time(&Time);
                 lastOrderId = (int) Time;
-
+                spdlog::info("Logged into account: " + std::string(Account));
             } else {
                 const auto msg = "Missing or Incomplete Account credentials.";
                 spdlog::error(msg);
@@ -310,6 +316,8 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
         return 0;
     }
     try {
+        spdlog::info("New Order for asset: " + std::string(Asset) + ", amount: " + std::to_string(Amount) + ", size: " +
+                     std::to_string(lotAmount * std::abs(Amount)) + ", limit: " + std::to_string(Limit));
 
         FTXOrder order;
         order.m_market = Asset;
@@ -348,9 +356,12 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
             *pPrice = confirmedOrder->m_price;
         }
         if (pFill) {
-            *pFill = confirmedOrder->m_filledSize/lotAmount;
+            *pFill = confirmedOrder->m_filledSize / lotAmount;
         }
-
+        spdlog::info("Order placed for asset: " + std::string(Asset) + ", filled size: " +
+                     std::to_string(confirmedOrder->m_filledSize / lotAmount) + ", price" +
+                     std::to_string(confirmedOrder->m_price) + ", clientId: " +
+                     std::to_string(confirmedOrder->m_clientId));
         return confirmedOrder->m_clientId;
     }
     catch (std::exception &e) {
