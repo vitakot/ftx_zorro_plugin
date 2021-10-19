@@ -97,7 +97,17 @@ void FTXAccount::fromJson(const nlohmann::json &json) {
 }
 
 nlohmann::json FTXOrder::toJson() const {
-    throw std::exception("Unimplemented: FTXOrder::toJson()");
+    nlohmann::json json;
+    json["market"] = m_market;
+    json["side"] = m_side._to_string();
+    json["price"] = m_price;
+    json["type"] = m_type._to_string();
+    json["size"] = m_size;
+    json["reduceOnly"] = m_reduceOnly;
+    json["ioc"] = m_ioc;
+    json["postOnly"] = m_postOnly;
+    json["clientId"] = m_clientId;
+    return json;
 }
 
 void FTXOrder::fromJson(const nlohmann::json &json) {
