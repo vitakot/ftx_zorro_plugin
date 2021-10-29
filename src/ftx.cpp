@@ -166,11 +166,11 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
             spdlog::error(msg);
             return 0;
         }
-        return 1;
-
         if (verbose) {
             spdlog::info("Calling BrokerLogin end, user: {}, pswd: {}, type: {}, account: {}", User, Pwd, Type, Account);
         }
+
+        return 1;
     }
     catch (std::exception &e) {
         spdlog::error(e.what());
@@ -226,11 +226,6 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
         BrokerError("Cannot acquire asset info from server.");
     }
 
-    if (verbose) {
-        spdlog::info("Calling BrokerAsset end, asset: {}, price: {}, spread: {}, volume: {}", Asset, *pPrice, *pSpread,
-                     *pVolume);
-    }
-
     return 0;
 }
 
@@ -260,7 +255,7 @@ DLLFUNC_C int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal
         BrokerError("Cannot acquire account info from server.");
     }
 
-    if (verbose) {
+    if (verbose && pdBalance) {
         spdlog::info("Calling BrokerAccount end, account: {}, balance: {}", Account, *pdBalance);
     }
 
@@ -409,7 +404,7 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
         BrokerError("Cannot send order to server.");
     }
 
-    if (verbose) {
+    if (verbose && pPrice && pFill) {
         spdlog::info("Calling BrokerBuy2 end, asset: {}, amount: {}, stopDist: {}, limit: {}, price: {}, fill: {}",
                      Asset,
                      Amount, dStopDist, Limit, *pPrice, *pFill);
