@@ -15,7 +15,7 @@ int main() {
     int fill;
 
     CreateDummyClient();
-    BrokerBuy2((char*)"", 10, 0.0, 0.0, &price, &fill);
+    BrokerBuy2((char*)"BTC-PERP", 10, 0.0, 0.0, &price, &fill);
 
     return 0;
 }

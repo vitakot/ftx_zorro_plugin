@@ -120,6 +120,10 @@ DLLFUNC_C void BrokerHTTP(FARPROC fpSend, FARPROC fpStatus, FARPROC fpResult, FA
 
 DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
 
+    if (verbose) {
+        spdlog::info("Calling BrokerLogin, user: {}, pswd: {}, type: {}, account: {}", User, Pwd, Type, Account);
+    }
+
     if (!User) {
         return 0;
     } else if (((std::string) Type) == "Demo") {
@@ -163,6 +167,10 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
             return 0;
         }
         return 1;
+
+        if (verbose) {
+            spdlog::info("Calling BrokerLogin end, user: {}, pswd: {}, type: {}, account: {}", User, Pwd, Type, Account);
+        }
     }
     catch (std::exception &e) {
         spdlog::error(e.what());
@@ -173,6 +181,10 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
 DLLFUNC_C int
 BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, double *pPip, double *pPipCost,
             double *pLotAmount, double *pMarginCost, double *pRollLong, double *pRollShort) {
+
+    if (verbose) {
+        spdlog::info("Calling BrokerAsset, asset: {}", Asset);
+    }
 
     if (!ftxClient) {
         spdlog::critical("FTX Client instance not initialized.");
@@ -214,10 +226,20 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
         BrokerError("Cannot acquire asset info from server.");
     }
 
+    if (verbose) {
+        spdlog::info("Calling BrokerAsset end, asset: {}, price: {}, spread: {}, volume: {}", Asset, *pPrice, *pSpread,
+                     *pVolume);
+    }
+
     return 0;
 }
 
 DLLFUNC_C int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal, double *pdMarginVal) {
+
+    if (verbose) {
+        spdlog::info("Calling BrokerAccount, account: {}", Account);
+    }
+
     if (!ftxClient) {
         spdlog::critical("FTX Client instance not initialized.");
         return 0;
@@ -238,6 +260,10 @@ DLLFUNC_C int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal
         BrokerError("Cannot acquire account info from server.");
     }
 
+    if (verbose) {
+        spdlog::info("Calling BrokerAccount end, account: {}, balance: {}", Account, *pdBalance);
+    }
+
     return 0;
 }
 
@@ -250,6 +276,11 @@ DLLFUNC_C int BrokerTime(DATE *pTimeGMT) {
 }
 
 DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinutes, int nTicks, T6 *ticks) {
+
+    if (verbose) {
+        spdlog::info("Calling BrokerHistory2, asset: {}, start: {}, end: {}, res_minutes: {}, ticks: {}", Asset,
+                     convertTime(tStart), convertTime(tEnd), nTickMinutes, nTicks);
+    }
 
     if (!Asset || !ticks || !nTicks) {
         return 0;
@@ -306,10 +337,19 @@ DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinut
         BrokerError("Cannot acquire historical data from server.");
     }
 
+    if (verbose) {
+        spdlog::info("Calling BrokerHistory2 end, asset: {}", Asset);
+    }
+
     return 0;
 }
 
 DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit, double *pPrice, int *pFill) {
+
+    if (verbose) {
+        spdlog::info("Calling BrokerBuy2, asset: {}, amount: {}, stopDist: {}, limit: {}", Asset, Amount, dStopDist,
+                     Limit);
+    }
 
     if (!ftxClient) {
         spdlog::critical("FTX Client instance not initialized.");
@@ -369,9 +409,19 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
         BrokerError("Cannot send order to server.");
     }
 
+    if (verbose) {
+        spdlog::info("Calling BrokerBuy2 end, asset: {}, amount: {}, stopDist: {}, limit: {}, price: {}, fill: {}",
+                     Asset,
+                     Amount, dStopDist, Limit, *pPrice, *pFill);
+    }
+
     return 0;
 }
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
+
+    if (verbose) {
+        spdlog::info("Calling BrokerCommand, command: {}, parameter: {}", Command, dwParameter);
+    }
 
     switch (Command) {
         case SET_ORDERTYPE:
@@ -437,6 +487,7 @@ DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
 }
 
 DLLFUNC_C void CreateDummyClient() {
+
     auto logger = spdlog::basic_logger_mt("ftx_logger", R"(C:\Users\vitez\Zorro\Plugin\ftx_test.log)");
     spdlog::set_default_logger(logger);
     spdlog::flush_on(spdlog::level::info);
