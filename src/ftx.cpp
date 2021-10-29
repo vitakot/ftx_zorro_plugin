@@ -435,3 +435,19 @@ DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
 
     return 0;
 }
+
+DLLFUNC_C void CreateDummyClient() {
+    auto logger = spdlog::basic_logger_mt("ftx_logger", R"(C:\Users\vitez\Zorro\Plugin\ftx_test.log)");
+    spdlog::set_default_logger(logger);
+    spdlog::flush_on(spdlog::level::info);
+
+    ftxClient = std::make_unique<FTXClient>("User", "Pwd", "Account");
+    ftxClient->setHttpGetMethod(httpGetMethod);
+    ftxClient->setHttpDeleteMethod(httpDeleteMethod);
+    ftxClient->setHttpPostMethod(httpPostMethod);
+
+    time_t Time;
+    time(&Time);
+    lastOrderId = (int) Time;
+    spdlog::info("Logged into account: " + std::string("Account"));
+}

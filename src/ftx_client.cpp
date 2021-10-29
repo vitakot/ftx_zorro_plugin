@@ -192,7 +192,7 @@ std::optional<FTXOrder> FTXClient::placeOrder(const FTXOrder &order) const {
 
     std::string response;
     std::string path = "/api/orders";
-    std::string body = order.toJson();
+    std::string body = order.toJson().dump();
     std::string header = createHeader("POST", path, std::string());
     std::string url = std::string(API_URI) + path;
 

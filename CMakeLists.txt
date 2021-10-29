@@ -28,3 +28,6 @@ add_library(ftx SHARED dllmain.cpp src/ftx.cpp ${SOURCES} ${HEADERS})
 target_compile_definitions(ftx PUBLIC FTX_DLL_EXPORTS)
 
 target_link_libraries(ftx spdlog)
+
+add_executable(ftx_test test/test.cpp)
+target_link_libraries(ftx_test ftx)

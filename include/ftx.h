@@ -47,4 +47,7 @@ DLLFUNC_C int BrokerBuy2(char* Asset,int Amount,double dStopDist,double Limit,do
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter);
 DLLFUNC_C int BrokerAccount(char* Account,double *pdBalance,double *pdTradeVal,double *pdMarginVal);
 
+// Functions exposed for unit testing
+DLLFUNC_C void CreateDummyClient();
+
 #endif //FTX_ZORRO_PLUGIN_FTX_H
