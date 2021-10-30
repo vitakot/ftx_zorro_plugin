@@ -133,8 +133,7 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
         return 0;
     } else {
         if (!ftxClient) {
-            auto logger = spdlog::basic_logger_mt("ftx_logger", R"(C:\Users\Administrator\Zorro\Plugin\ftx.log)");
-            //auto logger = spdlog::basic_logger_mt("ftx_logger", R"(C:\Users\vitez\Zorro\Plugin\ftx.log)");
+            auto logger = spdlog::basic_logger_mt("ftx_logger", R"(./Log/ftx.log)");
             spdlog::set_default_logger(logger);
             spdlog::flush_on(spdlog::level::info);
 
@@ -501,7 +500,7 @@ DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
 
 DLLFUNC_C void CreateDummyClient() {
 
-    auto logger = spdlog::basic_logger_mt("ftx_logger", R"(C:\Users\vitez\Zorro\Plugin\ftx_test.log)");
+    auto logger = spdlog::basic_logger_mt("ftx_logger", R"(./Log/ftx_test.log)");
     spdlog::set_default_logger(logger);
     spdlog::flush_on(spdlog::level::info);
 
