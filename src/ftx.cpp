@@ -182,9 +182,7 @@ DLLFUNC_C int
 BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, double *pPip, double *pPipCost,
             double *pLotAmount, double *pMarginCost, double *pRollLong, double *pRollShort) {
 
-    if (verbose) {
-        spdlog::info("Calling BrokerAsset, asset: {}", Asset);
-    }
+    // NOTE: Do not log normal state, this function is called every second!
 
     if (!ftxClient) {
         spdlog::critical("FTX Client instance not initialized.");
@@ -207,10 +205,6 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
             }
             if (pVolume) {
                 *pVolume = (*market).m_quoteVolume24h;
-            }
-
-            if (verbose && pPrice) {
-                spdlog::info("Calling BrokerAsset end, asset: {}, price: {}", Asset, *pPrice);
             }
 
             return 1;
