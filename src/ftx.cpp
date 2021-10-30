@@ -209,6 +209,10 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
                 *pVolume = (*market).m_quoteVolume24h;
             }
 
+            if (verbose && pPrice) {
+                spdlog::info("Calling BrokerAsset end, asset: {}, price: {}", Asset, *pPrice);
+            }
+
             return 1;
         }
 
@@ -252,6 +256,11 @@ DLLFUNC_C int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal
     }
     catch (std::exception &e) {
         spdlog::error(e.what());
+
+        if(!ftxClient->getlastError().empty()) {
+            spdlog::error(ftxClient->getlastError());
+        }
+
         BrokerError("Cannot acquire account info from server.");
     }
 
@@ -329,6 +338,11 @@ DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinut
     }
     catch (std::exception &e) {
         spdlog::error(e.what());
+
+        if(!ftxClient->getlastError().empty()) {
+            spdlog::error(ftxClient->getlastError());
+        }
+
         BrokerError("Cannot acquire historical data from server.");
     }
 
@@ -383,6 +397,11 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
         if (!confirmedOrder) {
             std::string msg = "Cannot place order: " + std::string(Asset) + ", size: " + std::to_string(Amount);
             spdlog::error(msg);
+
+            if(!ftxClient->getlastError().empty()) {
+                spdlog::error(ftxClient->getlastError());
+            }
+
             BrokerError(msg.c_str());
             return 0;
         }
@@ -401,6 +420,11 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
     }
     catch (std::exception &e) {
         spdlog::error(e.what());
+
+        if(!ftxClient->getlastError().empty()) {
+            spdlog::error(ftxClient->getlastError());
+        }
+
         BrokerError("Cannot send order to server.");
     }
 

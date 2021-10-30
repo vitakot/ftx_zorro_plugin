@@ -48,7 +48,9 @@ FTXClient::FTXClient(const std::string &apiKey, const std::string &apiSecret, co
 }
 
 std::string FTXClient::getlastError() const {
-    return m_lastError;
+    auto retVal = m_lastError;
+    m_lastError.clear();
+    return retVal;
 }
 
 bool FTXClient::isValidCandleResolution(std::int32_t resolution) {
