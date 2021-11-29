@@ -24,10 +24,10 @@ set(SOURCES
         src/stdafx.cpp
         src/sha256.cpp)
 
-add_library(ftx SHARED dllmain.cpp src/ftx.cpp ${SOURCES} ${HEADERS})
-target_compile_definitions(ftx PUBLIC FTX_DLL_EXPORTS)
+add_library(FTX SHARED dllmain.cpp src/ftx.cpp ${SOURCES} ${HEADERS})
+target_compile_definitions(FTX PUBLIC FTX_DLL_EXPORTS)
 
-target_link_libraries(ftx spdlog)
+target_link_libraries(FTX spdlog)
 
 add_executable(ftx_test test/test.cpp)
-target_link_libraries(ftx_test ftx)
+target_link_libraries(ftx_test FTX)
