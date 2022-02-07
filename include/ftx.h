@@ -4,7 +4,7 @@ https://github.com/vitakot/ftx_zorro_plugin
 
 Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 SPDX-License-Identifier: MIT
-Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
+Copyright (c) 2022 Vitezslav Kot <vitezslav.kot@gmail.com>.
 */
 
 #ifndef FTX_ZORRO_PLUGIN_FTX_H
@@ -26,17 +26,8 @@ int (__cdecl *BrokerError)(const char *txt) = nullptr;
 
 int (__cdecl *BrokerProgress)(const int percent) = nullptr;
 
-int (__cdecl *http_send)(char *url, char *data, char *header) = nullptr;
-
-long (__cdecl *http_status)(int id) = nullptr;
-
-long (__cdecl *http_result)(int id, char *content, long size) = nullptr;
-
-void (__cdecl *http_free)(int id);
-
 // zorro functions
 DLLFUNC_C int BrokerOpen(char *Name, FARPROC fpError, FARPROC fpProgress);
-DLLFUNC_C void BrokerHTTP(FARPROC fpSend, FARPROC fpStatus, FARPROC fpResult, FARPROC fpFree);
 DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account);
 DLLFUNC_C int BrokerTime(DATE *pTimeGMT);
 DLLFUNC_C int BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, double *pPip, double *pPipCost,
@@ -46,8 +37,5 @@ DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinut
 DLLFUNC_C int BrokerBuy2(char* Asset,int Amount,double dStopDist,double Limit,double *pPrice,int *pFill);
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter);
 DLLFUNC_C int BrokerAccount(char* Account,double *pdBalance,double *pdTradeVal,double *pdMarginVal);
-
-// Functions exposed for unit testing
-DLLFUNC_C void CreateDummyClient();
 
 #endif //FTX_ZORRO_PLUGIN_FTX_H

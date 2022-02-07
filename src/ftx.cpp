@@ -4,15 +4,17 @@ https://github.com/vitakot/ftx_zorro_plugin
 
 Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 SPDX-License-Identifier: MIT
-Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
+Copyright (c) 2022 Vitezslav Kot <vitezslav.kot@gmail.com>.
 */
 
 #include "stdafx.h"
 #include "ftx.h"
-#include "utils.h"
+#include <ftx_api/utils.h>
+#include <ftx_api/ftx_rest_client.h>
+#include <ftx_api/ftx_ws_stream_manager.h>
 #include <wtypes.h>
 #include <string>
-#include <ftx_client.h>
+#include <chrono>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <iomanip>
@@ -20,6 +22,8 @@ Copyright (c) 2021 Vitezslav Kot <vitezslav.kot@gmail.com>.
 
 #define PLUGIN_VERSION    2
 #undef min
+
+using namespace std::chrono_literals;
 
 bool verbose = true;
 
@@ -29,79 +33,18 @@ static int orderType = 0;
 static double lotAmount = 1.0;
 static int loopMs = 50;     // Actually unused
 static int waitMs = 30000;  // Actually unused
-static std::unique_ptr<FTXClient> ftxClient;
+static std::unique_ptr<ftx::RESTClient> ftxClient;
+static std::unique_ptr<ftx::WSStreamManager> streamManager;
+static int64_t lastKeepAliveTime = 0;
+
+enum ExchangeStatus {
+    Unavailable = 0,
+    Closed = 1,
+    Open = 2
+};
 
 __int64 convertTime(DATE Date) {
     return (__int64) ((Date - 25569.) * 24. * 60. * 60.);
-}
-
-bool httpMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
-    int n;
-    int id = 0;
-
-    if (body.empty()) {
-        id = http_send(const_cast<char *>(url.data()), nullptr,
-                       const_cast<char *>(header.data()));
-    } else {
-        id = http_send(const_cast<char *>(url.data()), const_cast<char *>(body.data()),
-                       const_cast<char *>(header.data()));
-    }
-
-    if (!id) {
-        if (verbose) {
-            const auto msg = "Cannot connect to server.";
-            spdlog::error(msg);
-            BrokerError(msg);
-        }
-        return true;
-    }
-
-    while (!http_status(id)) {
-        Sleep(100); // wait for the server to reply
-        if (!BrokerProgress(1)) {
-            if (verbose) {
-                const auto msg = "BrokerProgress returned zero. Aborting...";
-                spdlog::error(msg);
-                BrokerError(msg);
-            }
-            http_free(id); //always clean up the id!
-            return false; //failure
-        } // print dots, abort if returns zero.
-    }
-
-    n = http_status(id);
-
-    if (n > 0)  //transfer successful?
-    {
-        char *output;
-        output = (char *) malloc(n + 1);
-        http_result(id, output, n);   //get the replied IP
-        response = output;
-        free(output); //free up memory allocation
-        http_free(id); //always clean up the id!
-        return true; //success
-    } else {
-        if (verbose) {
-            const auto msg = "Unknown error during transfer from server.";
-            spdlog::error(msg);
-            BrokerError(msg);
-        }
-        http_free(id); //always clean up the id!
-        return false; //failure
-    }
-}
-
-bool httpGetMethod(const std::string &url, const std::string &header, std::string &response) {
-    return httpMethod(url, header, "", response);
-}
-
-bool
-httpDeleteMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
-    return httpMethod(url, header, body, response);
-}
-
-bool httpPostMethod(const std::string &url, const std::string &header, const std::string &body, std::string &response) {
-    return httpMethod(url, header, body, response);
 }
 
 DLLFUNC_C int BrokerOpen(char *Name, FARPROC fpError, FARPROC fpProgress) {
@@ -111,11 +54,28 @@ DLLFUNC_C int BrokerOpen(char *Name, FARPROC fpError, FARPROC fpProgress) {
     return PLUGIN_VERSION;
 }
 
-DLLFUNC_C void BrokerHTTP(FARPROC fpSend, FARPROC fpStatus, FARPROC fpResult, FARPROC fpFree) {
-    (FARPROC &) http_send = fpSend;
-    (FARPROC &) http_status = fpStatus;
-    (FARPROC &) http_result = fpResult;
-    (FARPROC &) http_free = fpFree;
+void logFunction(ftx::LogSeverity severity, const std::string &errmsg) {
+
+    switch (severity) {
+        case ftx::LogSeverity::Info:
+            spdlog::info(errmsg);
+            break;
+        case ftx::LogSeverity::Warning:
+            spdlog::warn(errmsg);
+            break;
+        case ftx::LogSeverity::Critical:
+            spdlog::critical(errmsg);
+            break;
+        case ftx::LogSeverity::Error:
+            spdlog::error(errmsg);
+            break;
+        case ftx::LogSeverity::Debug:
+            spdlog::debug(errmsg);
+            break;
+        case ftx::LogSeverity::Trace:
+            spdlog::trace(errmsg);
+            break;
+    }
 }
 
 DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
@@ -138,15 +98,11 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
             spdlog::flush_on(spdlog::level::info);
 
             if (!std::string_view(User).empty() && !std::string_view(Pwd).empty()) {
-                ftxClient = std::make_unique<FTXClient>(User, Pwd, Account);
-                ftxClient->setHttpGetMethod(httpGetMethod);
-                ftxClient->setHttpDeleteMethod(httpDeleteMethod);
-                ftxClient->setHttpPostMethod(httpPostMethod);
-
+                ftxClient = std::make_unique<ftx::RESTClient>(User, Pwd, Account);
                 time_t Time;
                 time(&Time);
                 lastOrderId = (int) Time;
-                spdlog::info("Logged into account: " + std::string(Account));
+                spdlog::info("Logged into account: {}", Account);
             } else {
                 const auto msg = "Missing or Incomplete Account credentials.";
                 spdlog::error(msg);
@@ -156,23 +112,29 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
         } else {
             ftxClient->setCredentials(User, Pwd, Account);
         }
+
+        if (!streamManager) {
+            streamManager = std::make_unique<ftx::WSStreamManager>(User, Pwd, Account);
+            streamManager->setLoggerCallback(&logFunction);
+
+            lastKeepAliveTime = duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+
+        }
     }
 
     try {
         const auto account = ftxClient->getAccountInfo();
-        if (!account) {
-            const auto msg = "Cannot log into account: " + std::string(Account) + ".";
-            spdlog::error(msg);
-            return 0;
-        }
+
         if (verbose) {
-            spdlog::info("Calling BrokerLogin end, user: {}, pswd: {}, type: {}, account: {}", User, Pwd, Type, Account);
+            spdlog::info("Calling BrokerLogin end, user: {}, pswd: {}, type: {}, account: {}", User, Pwd, Type,
+                         Account);
         }
 
         return 1;
     }
     catch (std::exception &e) {
-        spdlog::error(e.what());
+        spdlog::error("Cannot log into account: {}, reason: {}", Account, e.what());
         return 0;
     }
 }
@@ -181,48 +143,77 @@ DLLFUNC_C int
 BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, double *pPip, double *pPipCost,
             double *pLotAmount, double *pMarginCost, double *pRollLong, double *pRollShort) {
 
-    // NOTE: Do not log normal state, this function is called every second!
-
+    /// NOTE: Do not log normal state, this function is called every second!
     if (!ftxClient) {
         spdlog::critical("FTX Client instance not initialized.");
         return 0;
     }
 
-    try {
-        const auto market = ftxClient->getMarket(Asset);
+    if (pPip != nullptr) {
+        try {
+            const auto market = ftxClient->getMarket(Asset);
 
-        if (market) {
-            if ((*market).m_ask == 0.0 || (*market).m_bid == 0.0) {
+            if (market.m_ask == 0.0 || market.m_bid == 0.0) {
                 return 0;
             }
 
             if (pPrice) {
-                *pPrice = (*market).m_ask;
+                *pPrice = market.m_ask;
             }
             if (pSpread) {
-                *pSpread = (*market).m_ask - (*market).m_bid;
+                *pSpread = market.m_ask - market.m_bid;
             }
             if (pVolume) {
-                *pVolume = (*market).m_quoteVolume24h;
+                *pVolume = market.m_quoteVolume24h;
             }
-
+            if (pPip) {
+                *pPip = market.m_sizeIncrement;
+            }
+            if (pLotAmount) {
+                *pLotAmount = market.m_minProvideSize;
+            }
+            if (pPipCost) {
+                *pPipCost = market.m_minProvideSize * market.m_sizeIncrement;
+            }
             return 1;
         }
-
-        auto msg = ftxClient->getlastError();
-
-        if (msg.empty()) {
-            msg = "Cannot acquire asset info from server.";
-            BrokerError(msg.c_str());
+        catch (std::exception &e) {
+            spdlog::error("Cannot acquire asset info from server, reason: {}", e.what());
+            BrokerError("Cannot acquire asset info from server.");
         }
-        spdlog::error(msg);
-        BrokerError(msg.c_str());
-    }
-    catch (std::exception &e) {
-        spdlog::error(e.what());
-        BrokerError("Cannot acquire asset info from server.");
-    }
+    } else {
+        try {
+            /// Subscribe stream for Asset - if not already subscribed
+            streamManager->subscribeTickerStream(Asset);
 
+            const auto tickPrice = streamManager->readTickerData(Asset);
+
+            if (tickPrice) {
+
+                const auto tickerPrice = *tickPrice;
+
+                if (tickerPrice.m_ask == 0.0 || tickerPrice.m_bid == 0.0) {
+                    return 0;
+                }
+
+                if (pPrice) {
+                    *pPrice = tickerPrice.m_ask;
+                }
+                if (pSpread) {
+                    *pSpread = tickerPrice.m_ask - tickerPrice.m_bid;
+                }
+                if (pVolume) {
+                    *pVolume = tickerPrice.m_askSize + tickerPrice.m_bidSize;
+                }
+
+                return 1;
+            }
+        }
+        catch (std::exception &e) {
+            spdlog::error("Cannot acquire asset info from server, reason: {}", e.what());
+            BrokerError("Cannot acquire asset info from server.");
+        }
+    }
     return 0;
 }
 
@@ -240,20 +231,13 @@ DLLFUNC_C int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal
     try {
         const auto account = ftxClient->getAccountInfo();
 
-        if (account) {
-            if (pdBalance) {
-                *pdBalance = std::round((*account).m_totalAccountValue);
-            }
-            return 1;
+        if (pdBalance) {
+            *pdBalance = std::round(account.m_totalAccountValue);
         }
+        return 1;
     }
     catch (std::exception &e) {
-        spdlog::error(e.what());
-
-        if(!ftxClient->getlastError().empty()) {
-            spdlog::error(ftxClient->getlastError());
-        }
-
+        spdlog::error("Cannot acquire account info from server, reason: {}", e.what());
         BrokerError("Cannot acquire account info from server.");
     }
 
@@ -267,9 +251,23 @@ DLLFUNC_C int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal
 DLLFUNC_C int BrokerTime(DATE *pTimeGMT) {
 
     if (!ftxClient) {
-        return 0;
+        return ExchangeStatus::Unavailable;
     }
-    return 2;
+
+    const auto currentTime = duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+
+    /// Send keep alive message after each 15 seconds
+    if ((lastKeepAliveTime + 15 * 1000) < currentTime) {
+        if (streamManager) {
+            streamManager->pingAll();
+        }
+
+        lastKeepAliveTime = currentTime;
+    }
+
+    /// FTX Exchange never closes
+    return ExchangeStatus::Open;
 }
 
 DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinutes, int nTicks, T6 *ticks) {
@@ -292,7 +290,7 @@ DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinut
 
         auto resolution = nTickMinutes * 60;
 
-        if (!FTXClient::isValidCandleResolution(resolution)) {
+        if (!ftx::RESTClient::isValidCandleResolution(resolution)) {
             std::string msg = "Invalid data resolution: " + std::to_string(resolution) + ".";
             spdlog::error(msg);
             BrokerError(msg.c_str());
@@ -301,41 +299,29 @@ DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinut
 
         auto candles = ftxClient->getHistoricalPrices(Asset, resolution, convertTime(tStart), convertTime(tEnd));
 
-        if (!candles) {
-            std::string msg = "No historical data.";
-            spdlog::error(msg);
-            BrokerError(msg.c_str());
-            return 0;
-        }
+        const auto maxCandles = std::min(nTicks, (int) candles.size());
+        std::reverse(candles.begin(), candles.end());
 
-        const auto maxCandles = std::min(nTicks, (int) (*candles).size());
-        std::reverse((*candles).begin(), (*candles).end());
-
-        // From most recent to oldest.
+        /// From most recent to oldest.
         for (int i = 0; i < maxCandles; i++, ticks++) {
-            ticks->fOpen = static_cast<float>((*candles)[i].m_open);
-            ticks->fHigh = static_cast<float>((*candles)[i].m_high);
-            ticks->fLow = static_cast<float>((*candles)[i].m_low);
-            ticks->fClose = static_cast<float>((*candles)[i].m_close);
-            ticks->fVol = static_cast<float>((*candles)[i].m_volume);
+            ticks->fOpen = static_cast<float>(candles[i].m_open);
+            ticks->fHigh = static_cast<float>(candles[i].m_high);
+            ticks->fLow = static_cast<float>(candles[i].m_low);
+            ticks->fClose = static_cast<float>(candles[i].m_close);
+            ticks->fVol = static_cast<float>(candles[i].m_volume);
 
             std::tm candleTime{};
-            std::istringstream ss((*candles)[i].m_startTime);
+            std::istringstream ss(candles[i].m_startTime);
             ss >> std::get_time(&candleTime, "%Y-%m-%dT%H:%M:%S:%z");
-            ticks->time = systemTimeToVariantTimeMs(candleTime.tm_year + 1900, candleTime.tm_mon + 1,
-                                                    candleTime.tm_mday,
-                                                    candleTime.tm_hour, candleTime.tm_min, candleTime.tm_sec, 0);
+            ticks->time = ftx::systemTimeToVariantTimeMs(candleTime.tm_year + 1900, candleTime.tm_mon + 1,
+                                                         candleTime.tm_mday,
+                                                         candleTime.tm_hour, candleTime.tm_min, candleTime.tm_sec, 0);
         }
 
         return maxCandles;
     }
     catch (std::exception &e) {
-        spdlog::error(e.what());
-
-        if(!ftxClient->getlastError().empty()) {
-            spdlog::error(ftxClient->getlastError());
-        }
-
+        spdlog::error("Cannot acquire historical data from server, reason: {}", e.what());
         BrokerError("Cannot acquire historical data from server.");
     }
 
@@ -361,63 +347,66 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
         spdlog::info("New Order for asset: " + std::string(Asset) + ", amount: " + std::to_string(Amount) + ", size: " +
                      std::to_string(lotAmount * std::abs(Amount)) + ", limit: " + std::to_string(Limit));
 
-        FTXOrder order;
+        ftx::Order order;
         order.m_market = Asset;
 
         if (Amount > 0) {
-            order.m_side = Side::Buy;
+            order.m_side = ftx::Side::buy;
         } else {
-            order.m_side = Side::Sell;
+            order.m_side = ftx::Side::sell;
         }
 
         if (Limit > 0.) {
             order.m_price = Limit;
-            order.m_type = OrderType::Limit;
+            order.m_type = ftx::OrderType::limit;
+        } else if (dStopDist != 0.0 && dStopDist != -1) {
+            order.m_price = Limit;
+            order.m_triggerPrice = dStopDist;
+            order.m_type = ftx::OrderType::stop;
         } else {
-            order.m_type = OrderType::Market;
+            order.m_type = ftx::OrderType::market;
         }
 
         order.m_size = lotAmount * std::abs(Amount);
 
-        if (orderType == 1) {
+        if (order.m_type == +ftx::OrderType::market) {
             order.m_ioc = true;
         }
 
-        order.m_clientId = lastOrderId++;
+        order.m_clientId = std::to_string(lastOrderId++);
 
         const auto confirmedOrder = ftxClient->placeOrder(order);
 
-        if (!confirmedOrder) {
-            std::string msg = "Cannot place order: " + std::string(Asset) + ", size: " + std::to_string(Amount);
-            spdlog::error(msg);
+        ftx::Order ackOrder;
+        int maxAttempts = 10;
+        int attemptNo = 0;
 
-            if(!ftxClient->getlastError().empty()) {
-                spdlog::error(ftxClient->getlastError());
+        while (ackOrder.m_filledSize != ackOrder.m_size) {
+
+            ackOrder = ftxClient->getOrderStatus(stoi(confirmedOrder.m_clientId), true);
+            attemptNo++;
+
+            if (attemptNo == maxAttempts) {
+                break;
             }
 
-            BrokerError(msg.c_str());
-            return 0;
+            std::this_thread::sleep_for(500ms);
         }
 
         if (pPrice) {
-            *pPrice = confirmedOrder->m_price;
+            *pPrice = ackOrder.m_avgFillPrice;
         }
         if (pFill) {
-            *pFill = confirmedOrder->m_filledSize / lotAmount;
+            *pFill = ackOrder.m_filledSize / lotAmount;
         }
         spdlog::info("Order placed for asset: " + std::string(Asset) + ", filled size: " +
-                     std::to_string(confirmedOrder->m_filledSize / lotAmount) + ", price" +
-                     std::to_string(confirmedOrder->m_price) + ", clientId: " +
-                     std::to_string(confirmedOrder->m_clientId));
-        return confirmedOrder->m_clientId;
+                     std::to_string(confirmedOrder.m_filledSize / lotAmount) + ", price" +
+                     std::to_string(confirmedOrder.m_price) + ", clientId: " + confirmedOrder.m_clientId);
+
+        return stoi(confirmedOrder.m_clientId);
     }
     catch (std::exception &e) {
-        spdlog::error(e.what());
-
-        if(!ftxClient->getlastError().empty()) {
-            spdlog::error(ftxClient->getlastError());
-        }
-
+        spdlog::error("Cannot send order to server, reason: {}", e.what());
         BrokerError("Cannot send order to server.");
     }
 
@@ -429,6 +418,7 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
 
     return 0;
 }
+
 DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
 
     if (verbose) {
@@ -456,14 +446,12 @@ DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
             if (ftxClient) {
                 try {
                     auto position = ftxClient->getPosition(currentSymbol);
-
-                    if (position) {
-                        return (*position).m_openSize;
-                    }
+                    return position.m_openSize;
                 }
                 catch (std::exception &e) {
-                    spdlog::error(e.what());
-                    BrokerError((std::string("Cannot get position of " + currentSymbol).c_str()));
+                    const auto msg = std::string("Cannot get position of " + currentSymbol);
+                    spdlog::error("{}, reason: {}", msg, e.what());
+                    BrokerError(msg.c_str());
                 }
             }
             break;
@@ -496,21 +484,4 @@ DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
     }
 
     return 0;
-}
-
-DLLFUNC_C void CreateDummyClient() {
-
-    auto logger = spdlog::basic_logger_mt("ftx_logger", R"(./Log/ftx_test.log)");
-    spdlog::set_default_logger(logger);
-    spdlog::flush_on(spdlog::level::info);
-
-    ftxClient = std::make_unique<FTXClient>("User", "Pwd", "Account");
-    ftxClient->setHttpGetMethod(httpGetMethod);
-    ftxClient->setHttpDeleteMethod(httpDeleteMethod);
-    ftxClient->setHttpPostMethod(httpPostMethod);
-
-    time_t Time;
-    time(&Time);
-    lastOrderId = (int) Time;
-    spdlog::info("Logged into account: " + std::string("Account"));
 }
