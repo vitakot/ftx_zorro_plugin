@@ -26,6 +26,8 @@ public:
 
     WSStreamManager(const std::string &apiKey, const std::string &apiSecret, const std::string &subAccountName);
 
+    ~WSStreamManager();
+
     /**
      * Check if the Ticker Stream is already subscribed for a selected pair, if not then subscribe it. When force parameter
      * is true then re-subscribe if ef already subscribed

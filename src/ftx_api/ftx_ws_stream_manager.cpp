@@ -55,7 +55,12 @@ WSStreamManager::WSStreamManager(const std::string &apiKey, const std::string &a
         spimpl::make_unique_impl<P>(apiKey, apiSecret, subAccountName)) {
 }
 
-void WSStreamManager::subscribeTickerStream(const std::string &pair, bool force) {
+WSStreamManager::~WSStreamManager() {
+    m_p->m_wsClient->unsubscribeAll();
+    m_p->m_timeout = 0;
+}
+void
+WSStreamManager::subscribeTickerStream(const std::string &pair, bool force) {
 
     auto handle = m_p->m_wsClient->findStream(WebSocketClient::composeStreamName(pair, Channel::ticker));
 

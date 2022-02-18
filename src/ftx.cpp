@@ -85,7 +85,11 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
     }
 
     if (!User) {
-        return 0;
+        streamManager.reset();
+        ftxClient.reset();
+        spdlog::info("Logout");
+        spdlog::shutdown();
+        return 1;
     } else if (((std::string) Type) == "Demo") {
         const auto msg = "Demo mode not supported by this plugin.";
         spdlog::error(msg);
@@ -443,6 +447,7 @@ DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
             currentSymbol = (char *) dwParameter;
             return 1;
         case GET_POSITION:
+            currentSymbol = (char *) dwParameter;
             if (ftxClient) {
                 try {
                     auto position = ftxClient->getPosition(currentSymbol);
