@@ -80,10 +80,6 @@ void logFunction(ftx::LogSeverity severity, const std::string &errmsg) {
 
 DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
 
-    if (verbose) {
-        spdlog::info("Calling BrokerLogin, user: {}, pswd: {}, type: {}, account: {}", User, Pwd, Type, Account);
-    }
-
     if (!User) {
         streamManager.reset();
         ftxClient.reset();
@@ -222,10 +218,6 @@ BrokerAsset(char *Asset, double *pPrice, double *pSpread, double *pVolume, doubl
 }
 
 DLLFUNC_C int BrokerAccount(char *Account, double *pdBalance, double *pdTradeVal, double *pdMarginVal) {
-
-    if (verbose) {
-        spdlog::info("Calling BrokerAccount, account: {}", Account);
-    }
 
     if (!ftxClient) {
         spdlog::critical("FTX Client instance not initialized.");
@@ -385,13 +377,15 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
         int maxAttempts = 10;
         int attemptNo = 0;
 
-        while (ackOrder.m_filledSize != ackOrder.m_size) {
+        while (ackOrder.m_status != +ftx::OrderStatus::closed) {
 
             ackOrder = ftxClient->getOrderStatus(stoi(confirmedOrder.m_clientId), true);
             attemptNo++;
 
             if (attemptNo == maxAttempts) {
-                break;
+                spdlog::error("Cannot send order to server, reason: order was not closed/filled");
+                BrokerError("Cannot send order to server.");
+                return 0;
             }
 
             std::this_thread::sleep_for(500ms);
@@ -401,7 +395,7 @@ DLLFUNC_C int BrokerBuy2(char *Asset, int Amount, double dStopDist, double Limit
             *pPrice = ackOrder.m_avgFillPrice;
         }
         if (pFill) {
-            *pFill = ackOrder.m_filledSize / lotAmount;
+            *pFill = std::round(ackOrder.m_filledSize / lotAmount);
         }
         spdlog::info("Order placed for asset: " + std::string(Asset) + ", filled size: " +
                      std::to_string(confirmedOrder.m_filledSize / lotAmount) + ", price" +
@@ -447,14 +441,14 @@ DLLFUNC_C double BrokerCommand(int Command, DWORD dwParameter) {
             currentSymbol = (char *) dwParameter;
             return 1;
         case GET_POSITION:
-            currentSymbol = (char *) dwParameter;
             if (ftxClient) {
+                const char *symbol = (char *) dwParameter;
                 try {
-                    auto position = ftxClient->getPosition(currentSymbol);
+                    auto position = ftxClient->getPosition(symbol);
                     return position.m_openSize;
                 }
                 catch (std::exception &e) {
-                    const auto msg = std::string("Cannot get position of " + currentSymbol);
+                    const auto msg = std::string("Cannot get position of " + std::string(symbol));
                     spdlog::error("{}, reason: {}", msg, e.what());
                     BrokerError(msg.c_str());
                 }
