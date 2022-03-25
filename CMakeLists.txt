@@ -6,10 +6,11 @@ add_definitions(-D_WIN32_WINNT=0x0A00)
 
 find_package(Boost 1.77 REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
-include_directories(include better-enums json/include SYSTEM ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
-add_subdirectory(json)
-add_subdirectory(spdlog)
+include_directories(include better-enums ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
+
 
 set(HEADERS
         include/ftx_api/ftx_http_session.h
@@ -34,4 +35,4 @@ set(SOURCES
 add_library(FTX SHARED dllmain.cpp src/ftx.cpp src/stdafx.cpp ${SOURCES} ${HEADERS})
 target_compile_definitions(FTX PUBLIC FTX_DLL_EXPORTS)
 
-target_link_libraries(FTX spdlog OpenSSL::Crypto OpenSSL::SSL)
+target_link_libraries(FTX PRIVATE spdlog::spdlog_header_only OpenSSL::Crypto OpenSSL::SSL nlohmann_json::nlohmann_json)
