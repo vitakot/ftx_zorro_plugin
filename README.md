@@ -11,6 +11,7 @@ FTX Plugin for Zorro Trader
 - https://github.com/gabime/spdlog
 - https://github.com/aantron/better-enums
 - https://github.com/nlohmann/json
+- https://www.boost.org
 
 # Limitations
 
