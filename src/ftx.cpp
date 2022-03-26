@@ -293,7 +293,7 @@ DLLFUNC_C int BrokerHistory2(char *Asset, DATE tStart, DATE tEnd, int nTickMinut
             return 0;
         }
 
-        int offsetStart = convertTime(tEnd) - nTicks * resolution;
+        int64_t offsetStart = convertTime(tEnd) - nTicks * resolution;
         auto candles = ftxClient->getHistoricalPrices(Asset, resolution, offsetStart, convertTime(tEnd));
 
         const auto maxCandles = std::min(nTicks, (int) candles.size());
