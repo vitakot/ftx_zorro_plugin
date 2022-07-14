@@ -3,11 +3,7 @@ FTX Plugin for Zorro Trader
 
 # Instructions
 
-- Build as the x86 (32 bit) architecture & place the output dynamic library FTX.dll into Zorro/Plugin folder.
-- Place dependencies into the Zorro root folder:
-  - fmt.dll
-  - libcrypto-1_1.dll
-  - libssl-1_1.dll
+- Unzip FTX_x64.7z or FTX_x86.7z prebuilt binary and place FTX.dll into Zorro/Plugin or Zorro/Plugin64 folder.
 - Plugin logs all issues into Zorro/Log/ftx.log file.
 
 # Dependencies
