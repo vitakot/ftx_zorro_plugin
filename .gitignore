@@ -34,3 +34,10 @@
 .idea
 /cmake-build-debug
 /cmake-build-release
+
+.vs
+VS/x64
+VS/x86
+VS/Release
+VS/Debug
+*.vcxproj.user
