@@ -17,6 +17,8 @@ using namespace std::chrono_literals;
 
 namespace ftx {
 
+static const int PING_INTERVAL_IN_S = 10;
+
 #define FTX_CB_ON_ERROR(cb, ec) \
     cb(__FILE__ "(" BOOST_PP_STRINGIZE(__LINE__) ")", (ec).value(), (ec).message(), nullptr, 0);
 
@@ -31,11 +33,32 @@ struct WebSocket::P {
     std::string m_streamName;
     boost::beast::multi_buffer m_wBuffer;
     std::vector<nlohmann::json> m_requests;
-    std::atomic<bool> m_pingSent = true;
+    boost::asio::steady_timer m_pingTimer;
+    std::chrono::time_point<std::chrono::system_clock> m_lastPingTime{};
+    std::chrono::time_point<std::chrono::system_clock> m_lastPongTime{};
+    onLogMessage m_logMessageCB;
 
-    explicit P(boost::asio::io_context &ioContext) : m_ssl{boost::asio::ssl::context::sslv23_client},
-                                                     m_resolver{ioContext}, m_ws{ioContext, m_ssl}, m_buf{},
-                                                     m_stopRequested{} {
+    std::function<void(const boost::system::error_code &ec)> m_timerHandler;
+
+    explicit P(boost::asio::io_context &ioContext, onLogMessage onLogMessageCB) : m_ssl{
+            boost::asio::ssl::context::sslv23_client},
+                                                                                  m_resolver{ioContext},
+                                                                                  m_ws{ioContext, m_ssl}, m_buf{},
+                                                                                  m_stopRequested{},
+                                                                                  m_pingTimer(ioContext,
+                                                                                              boost::asio::chrono::seconds(
+                                                                                                      PING_INTERVAL_IN_S)),
+                                                                                  m_logMessageCB(std::move(
+                                                                                          onLogMessageCB)) {
+
+        m_timerHandler = [this](const boost::system::error_code &ec) {
+
+            if (!m_stopRequested) {
+                ping();
+                m_pingTimer.expires_from_now(boost::asio::chrono::seconds(PING_INTERVAL_IN_S));
+                m_pingTimer.async_wait(m_timerHandler);
+            }
+        };
     }
 
     void
@@ -94,10 +117,22 @@ struct WebSocket::P {
 
     void onConnected(onMessageReceivedCB cb, holderType holder) {
         m_ws.control_callback(
-                [this]
-                        (boost::beast::websocket::frame_type kind, boost::beast::string_view payload) mutable {
-                    (void) kind;
-                    (void) payload;
+                [this](boost::beast::websocket::frame_type kind, boost::beast::string_view payload) mutable {
+
+                    m_ws.async_pong(
+                            boost::beast::websocket::ping_data{},
+                            [this](boost::beast::error_code ec) {
+
+                                if (ec) {
+                                    if (m_logMessageCB) {
+                                        m_logMessageCB(LogSeverity::Error,
+                                                       std::format("{}: {}\n", MAKE_FILELINE, ec.message()));
+                                    }
+                                } else {
+                                    m_lastPongTime = std::chrono::system_clock::now();
+                                }
+                            }
+                    );
                 }
         );
 
@@ -111,6 +146,8 @@ struct WebSocket::P {
                     }
                 }
         );
+
+        m_pingTimer.async_wait(m_timerHandler);
     }
 
     void onAsyncSSLHandshake(onMessageReceivedCB cb, holderType holder) {
@@ -223,9 +260,40 @@ struct WebSocket::P {
             startWrite(boost::system::error_code{}, std::move(cb), std::move(holder));
         }
     }
+
+    void ping() {
+        boost::beast::websocket::ping_data pingWebSocketFrame;
+
+        if (m_stopRequested) {
+            return;
+        }
+
+        std::chrono::duration<double> elapsed = m_lastPingTime - m_lastPongTime;
+
+        if (elapsed.count() > PING_INTERVAL_IN_S) {
+            if (m_logMessageCB) {
+                m_logMessageCB(LogSeverity::Error,
+                               std::format("{}: {}\n", MAKE_FILELINE, "ping expired, closing socket..."));
+            }
+            stop();
+            return;
+        }
+
+        m_ws.async_ping(pingWebSocketFrame, [this](boost::beast::error_code ec) {
+                            if (ec) {
+                                if (m_logMessageCB) {
+                                    m_logMessageCB(LogSeverity::Error, std::format("{}: {}\n", MAKE_FILELINE, ec.message()));
+                                }
+                            } else {
+                                m_lastPingTime = std::chrono::system_clock::now();
+                            }
+                        }
+        );
+    }
 };
 
-WebSocket::WebSocket(boost::asio::io_context &ioContext) : m_p(spimpl::make_unique_impl<P>(ioContext)) {
+WebSocket::WebSocket(boost::asio::io_context &ioContext, const onLogMessage &onLogMessageCB) : m_p(
+        spimpl::make_unique_impl<P>(ioContext, onLogMessageCB)) {
 
 }
 
@@ -244,12 +312,5 @@ std::string WebSocket::streamName() const {
 
 void WebSocket::setStreamName(const std::string &streamName) {
     m_p->m_streamName = streamName;
-}
-
-void WebSocket::ping() {
-
-    if (m_p->m_ws.is_open()) {
-        m_p->m_ws.ping({});
-    }
 }
 }

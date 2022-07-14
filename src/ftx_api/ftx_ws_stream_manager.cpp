@@ -179,10 +179,6 @@ void WSStreamManager::subscribeFillsStream(bool force) {
     }
 }
 
-void WSStreamManager::pingAll() {
-    m_p->m_wsClient->pingAll();
-}
-
 void WSStreamManager::setTimeout(int seconds) {
     m_p->m_timeout = seconds;
 }

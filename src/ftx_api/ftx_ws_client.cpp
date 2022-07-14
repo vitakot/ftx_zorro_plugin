@@ -8,6 +8,7 @@ Copyright (c) 2022 Vitezslav Kot <vitezslav.kot@gmail.com>.
 */
 
 #include <ftx_api/ftx_ws_client.h>
+#include <ftx_api/utils.h>
 #include <openssl/hmac.h>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
@@ -18,12 +19,6 @@ Copyright (c) 2022 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #include <openssl/sha.h>
 
 namespace ftx {
-
-#define STRINGIZE_I(x) #x
-#define STRINGIZE(x) STRINGIZE_I(x)
-
-#define MAKE_FILELINE \
-    __FILE__ "(" STRINGIZE(__LINE__) ")"
 
 const char *FTX_FUTURES_WS_HOST = "ftx.com";
 const char *FTX_FUTURES_WS_PORT = "443";
@@ -100,7 +95,7 @@ struct WebSocketClient::P {
         using argsTuple = typename boost::callable_traits::args<decltype(cb)>::type;
         using messageType = typename std::tuple_element<3, argsTuple>::type;
 
-        auto ws = std::make_shared<WebSocket>(m_ioContext);
+        auto ws = std::make_shared<WebSocket>(m_ioContext, m_logMessageCB);
         auto *h = ws.get();
         std::weak_ptr<WebSocket> wp{ws};
 
@@ -221,22 +216,6 @@ struct WebSocketClient::P {
                 ++it;
             }
         }
-    }
-
-    template<typename F>
-    void pingAllImpl(F f) {
-        for (auto it = m_map.begin(); it != m_map.end();) {
-            if (auto s = it->second.lock()) {
-                f(s);
-            }
-            ++it;
-        }
-    }
-
-    void pingAll() {
-        return pingAllImpl([](const auto &sp) {
-            sp->ping();
-        });
     }
 };
 
@@ -391,10 +370,6 @@ WebSocket::handle WebSocketClient::ticker(const std::string &pair, onEventCB cb)
 
 WebSocket::handle WebSocketClient::markets(const std::string &pair, onEventCB cb) {
     return m_p->startChannel(pair, Channel::markets, std::move(cb));
-}
-
-void WebSocketClient::pingAll() {
-    m_p->pingAll();
 }
 
 WebSocket::handle WebSocketClient::orders(onEventCB cb) {

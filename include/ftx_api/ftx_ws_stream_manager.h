@@ -76,11 +76,6 @@ public:
     [[nodiscard]] std::optional<TickerData> readTickerData(const std::string &pair);
 
     /**
-     * For keeping the communication alive - should be sent each 15 seconds
-     */
-    void pingAll();
-
-    /**
      * Waits for FillData with given OrderId received via WebSocket and read it. It will block at most Timeout time.
      * @param order An ACK response returned when placing order by REST
      * @return FillData structure if successful

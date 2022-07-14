@@ -35,7 +35,6 @@ static int loopMs = 50;     // Actually unused
 static int waitMs = 30000;  // Actually unused
 static std::unique_ptr<ftx::RESTClient> ftxClient;
 static std::unique_ptr<ftx::WSStreamManager> streamManager;
-static int64_t lastKeepAliveTime = 0;
 
 enum ExchangeStatus {
     Unavailable = 0,
@@ -116,10 +115,6 @@ DLLFUNC_C int BrokerLogin(char *User, char *Pwd, char *Type, char *Account) {
         if (!streamManager) {
             streamManager = std::make_unique<ftx::WSStreamManager>(User, Pwd, Account);
             streamManager->setLoggerCallback(&logFunction);
-
-            lastKeepAliveTime = duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()).count();
-
         }
     }
 
@@ -252,15 +247,6 @@ DLLFUNC_C int BrokerTime(DATE *pTimeGMT) {
 
     const auto currentTime = duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
-
-    /// Send keep alive message after each 15 seconds
-    if ((lastKeepAliveTime + 15 * 1000) < currentTime) {
-        if (streamManager) {
-            streamManager->pingAll();
-        }
-
-        lastKeepAliveTime = currentTime;
-    }
 
     /// FTX Exchange never closes
     return ExchangeStatus::Open;

@@ -14,6 +14,7 @@ Copyright (c) 2022 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #include <string>
 #include <functional>
 #include <ftx_api/ftx_models.h>
+#include <ftx_api/utils.h>
 
 namespace boost::asio {
 class io_context;
@@ -35,7 +36,7 @@ class WebSocket : public std::enable_shared_from_this<WebSocket> {
 public:
     using handle = void *;
 
-    explicit WebSocket(boost::asio::io_context &ioContext);
+    explicit WebSocket(boost::asio::io_context &ioContext, const onLogMessage &onLogMessageCB);
 
     virtual ~WebSocket() = default;
 
@@ -47,8 +48,6 @@ public:
     std::string streamName() const;
 
     void setStreamName(const std::string &streamName);
-
-    void ping();
 };
 
 }

@@ -15,6 +15,12 @@ Copyright (c) 2022 Vitezslav Kot <vitezslav.kot@gmail.com>.
 #include <string>
 #include <enum.h>
 
+#define STRINGIZE_I(x) #x
+#define STRINGIZE(x) STRINGIZE_I(x)
+
+#define MAKE_FILELINE \
+    __FILE__ "(" STRINGIZE(__LINE__) ")"
+
 namespace ftx {
 
 using Clock = std::chrono::system_clock;

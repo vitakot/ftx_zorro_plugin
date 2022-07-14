@@ -92,13 +92,6 @@ public:
     void unsubscribeAll();
 
     /**
-     * Send a Control Ping message - should be sent every 15 seconds otherwise the server will close
-     * inactive Websockets after 60 seconds. By inactive is meant that there is no traffic
-     * through the Websocket so Ticker stream usually stays open without pinging but it can't be relied upon
-    */
-    void pingAll();
-
-    /**
      * Set logger callback, if no set then all errors are writen to the stderr stream only
      * @param onLogMessageCB
      */
