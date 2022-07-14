@@ -276,13 +276,16 @@ bool WebSocketClient::isRunning() const {
 void WebSocketClient::run() {
 
     if (m_p->m_ioThread.joinable()) {
-        m_p->m_ioThread.join();
+        return;
     }
 
     m_p->m_ioThread = std::thread([&] {
         for (;;) {
             try {
                 m_p->m_isRunning = true;
+                if (m_p->m_ioContext.stopped()) {
+                    m_p->m_ioContext.restart();
+                }
                 m_p->m_ioContext.run();
                 m_p->m_isRunning = false;
                 break;
@@ -303,6 +306,9 @@ void WebSocketClient::runBlocking() {
     for (;;) {
         try {
             m_p->m_isRunning = true;
+            if (m_p->m_ioContext.stopped()) {
+                m_p->m_ioContext.restart();
+            }
             m_p->m_ioContext.run();
             m_p->m_isRunning = false;
             break;
@@ -347,7 +353,7 @@ WebSocket::handle WebSocketClient::findStream(const std::string &streamName) {
 void WebSocketClient::runFor(int seconds) {
 
     if (m_p->m_ioThread.joinable()) {
-        m_p->m_ioThread.join();
+        return;
     }
 
     m_p->m_ioThread = std::thread([&] {
