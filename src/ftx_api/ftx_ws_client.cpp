@@ -254,8 +254,14 @@ bool WebSocketClient::isRunning() const {
 
 void WebSocketClient::run() {
 
-    if (m_p->m_ioThread.joinable()) {
+    if (m_p->m_isRunning) {
         return;
+    }
+
+    m_p->m_isRunning = true;
+
+    if (m_p->m_ioThread.joinable()) {
+        m_p->m_ioThread.join();
     }
 
     m_p->m_ioThread = std::thread([&] {
@@ -277,6 +283,7 @@ void WebSocketClient::run() {
                 }
             }
         }
+        m_p->m_isRunning = false;
     });
 }
 
